@@ -1,0 +1,35 @@
+{ 
+    query { 
+        safes( 
+            orderBy: id
+            , first: 1000
+            , where: { 
+                id_gt: "0x094ead8a9e71abf4e2a6d38c6ff9684eefecd65e" 
+            }
+        ) {     
+            id
+            organization
+            outgoing {
+                limit
+                limitPercentage
+                canSendToAddress
+                userAddress
+            }
+            incoming {
+                limit
+                limitPercentage
+                canSendToAddress
+                userAddress
+            }
+            balances {
+                amount
+                token {
+                    id
+                    owner {
+                        id
+                    }
+                }
+            }
+        }
+    }
+}
