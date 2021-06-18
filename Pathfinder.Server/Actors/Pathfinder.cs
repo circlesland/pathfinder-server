@@ -7,7 +7,7 @@ using Newtonsoft.Json.Linq;
 
 namespace Pathfinder.Server.Actors
 {
-    public class PathfinderInstance : ReceiveActor
+    public class Pathfinder : ReceiveActor
     {
         #region Messages
         
@@ -60,7 +60,7 @@ namespace Pathfinder.Server.Actors
         private readonly IActorRef _processWrapper;
         private readonly string _databaseFile;
         
-        public PathfinderInstance(string executable, string databaseFile)
+        public Pathfinder(string executable, string databaseFile)
         {
             if (!File.Exists(executable))
             {
@@ -235,6 +235,6 @@ namespace Pathfinder.Server.Actors
         }
 
         public static Props Props(string executable, string databaseFile) 
-            => Akka.Actor.Props.Create<PathfinderInstance>(executable, databaseFile);
+            => Akka.Actor.Props.Create<Pathfinder>(executable, databaseFile);
     }
 }

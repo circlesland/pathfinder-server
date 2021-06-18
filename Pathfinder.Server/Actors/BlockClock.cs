@@ -12,6 +12,7 @@ namespace Pathfinder.Server.Actors
         public class NextBlock : Clock.Elapsed
         {
             public readonly HexBigInteger BlockNo;
+
             public NextBlock(HexBigInteger blockNo)
             {
                 BlockNo = blockNo;
@@ -27,7 +28,7 @@ namespace Pathfinder.Server.Actors
 
         private readonly string _rpcGateway;
         private HexBigInteger _lastBlock;
-        
+
         public BlockClock(string rpcGateway)
         {
             _rpcGateway = rpcGateway;
@@ -47,7 +48,11 @@ namespace Pathfinder.Server.Actors
                         Log.Info($"New block: {currentBlock}");
                         Context.System.EventStream.Publish(new NextBlock(currentBlock));
                     }
+
                     _lastBlock = currentBlock;
+                    break;
+                case Status.Failure failure:
+                    Log.Error(failure.Cause, "Couldn't get the current block.");
                     break;
             }
         }

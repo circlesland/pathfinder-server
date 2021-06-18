@@ -33,14 +33,14 @@ namespace Pathfinder.Server
         {
             dynamic args = new JObject();
             args.file = filename;
-            return new RpcMessage("loaddb", args);
+            return new ("loaddb", args);
         }
 
         public static RpcMessage LoadDbFromHexString(string dataString)
         {
             dynamic args = new JObject();
             args.data = dataString;
-            return new RpcMessage("loaddbStream", args);
+            return new ("loaddbStream", args);
         }
 
         private static void ValidateAddress(string address, string param)
@@ -57,7 +57,7 @@ namespace Pathfinder.Server
             dynamic args = new JObject();
             args.user = user;
             args.token = token;
-            return new RpcMessage("signup", args);
+            return new ("signup", args);
         }
 
         public static RpcMessage OrganizationSignup(string organization)
@@ -66,7 +66,7 @@ namespace Pathfinder.Server
             
             dynamic args = new JObject();
             args.organization = organization;
-            return new RpcMessage("organizationSignup", args);
+            return new ("organizationSignup", args);
         }
 
         public static RpcMessage Trust(string canSendTo, string user, int limitPercentage)
@@ -78,7 +78,7 @@ namespace Pathfinder.Server
             args.canSendTo = canSendTo;
             args.user = user;
             args.limitPercentage = limitPercentage;
-            return new RpcMessage("trust", args);
+            return new ("trust", args);
         }
 
         public static RpcMessage Transfer(string token, string from, string to, string value)
@@ -93,22 +93,22 @@ namespace Pathfinder.Server
             args.to = to;
             args.value = value;
             
-            return new RpcMessage("transfer", args);
+            return new ("transfer", args);
         }
 
         public static RpcMessage EdgeCount()
         {
-            return new RpcMessage("edgeCount", new JObject());
+            return new("edgeCount", new JObject());
         }
 
         public static RpcMessage DelayEdgeUpdates()
         {
-            return new RpcMessage("delayEdgeUpdates", new JObject());
+            return new ("delayEdgeUpdates", new JObject());
         }
 
         public static RpcMessage PerformEdgeUpdates()
         {
-            return new RpcMessage("performEdgeUpdates", new JObject());
+            return new ("performEdgeUpdates", new JObject());
         }
 
         public static RpcMessage Adjacencies(string user)
@@ -118,7 +118,7 @@ namespace Pathfinder.Server
             dynamic args = new JObject();
             args.user = user;
             
-            return new RpcMessage("adjacencies", args);
+            return new ("adjacencies", args);
         }
 
         public static RpcMessage Flow(string from, string to, string value)
@@ -131,7 +131,7 @@ namespace Pathfinder.Server
             args.to = to;
             args.value = value;
             
-            return new RpcMessage("flow", args);
+            return new ("flow", args);
         }
     }
 }

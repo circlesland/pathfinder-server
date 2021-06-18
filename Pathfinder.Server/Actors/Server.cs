@@ -4,7 +4,7 @@ using Pathfinder.Server.contracts;
 
 namespace Pathfinder.Server.Actors
 {
-    public class Main : UntypedActor
+    public class Server : UntypedActor
     {       
         private ILoggingAdapter Log { get; } = Context.GetLogger();
         
@@ -19,7 +19,7 @@ namespace Pathfinder.Server.Actors
         private readonly IActorRef _trustEventSource;
         private readonly IActorRef _transferEventSource;
         
-        public Main(string rpcGateway)
+        public Server(string rpcGateway)
         {
             _realTimeClock = Context.ActorOf(RealTimeClock.Props(), "RealTimeClock");
             _blockClock = Context.ActorOf(BlockClock.Props(rpcGateway), "BlockClock");
@@ -35,6 +35,6 @@ namespace Pathfinder.Server.Actors
         }
         
         public static Props Props(string rpcGateway) 
-            => Akka.Actor.Props.Create<Main>(rpcGateway);
+            => Akka.Actor.Props.Create<Server>(rpcGateway);
     }
 }

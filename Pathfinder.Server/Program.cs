@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Numerics;
 using System.Threading.Tasks;
 using Akka.Actor;
-using Nethereum.Web3;
-using Pathfinder.Server.contracts;
 
 namespace Pathfinder.Server
 {
@@ -28,9 +25,9 @@ namespace Pathfinder.Server
             
             using (var system = ActorSystem.Create("system", config))
             {
-                var main = system.ActorOf(Actors.Main.Props("https://rpc.circles.land"), "main");
+                var main = system.ActorOf(Actors.Server.Props("https://rpc.circles.land"), "main");
                 
-                var pathfinder = system.ActorOf(Actors.PathfinderInstance.Props(
+                var pathfinder = system.ActorOf(Actors.Pathfinder.Props(
                     "/home/daniel/src/pathfinder/build/pathfinder",
                     "/home/daniel/src/circles-world/PathfinderServer/Pathfinder.Server/db.dat"
                 ), "pathfinder");
