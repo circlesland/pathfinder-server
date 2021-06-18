@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -31,7 +32,7 @@ namespace Pathfinder.Server
         public static RpcMessage LoadDb(string filename)
         {
             dynamic args = new JObject();
-            args.file = "/home/daniel/src/circles-world/PathfinderServer/PathfinderServer/Server/data/db.dat";
+            args.file = filename;
             return new RpcMessage("loaddb", args);
         }
 
@@ -42,8 +43,17 @@ namespace Pathfinder.Server
             return new RpcMessage("loaddbStream", args);
         }
 
+        private static void ValidateAddress(string address, string param)
+        {
+            if (!Nethereum.Util.AddressUtil.Current.IsValidEthereumAddressHexFormat(address))
+                throw new ArgumentException("Not a valid ethereum address.", param);
+        }
+
         public static RpcMessage Signup(string user, string token)
         {
+            ValidateAddress(user, nameof(user));
+            ValidateAddress(token, nameof(token));
+            
             dynamic args = new JObject();
             args.user = user;
             args.token = token;
@@ -52,6 +62,8 @@ namespace Pathfinder.Server
 
         public static RpcMessage OrganizationSignup(string organization)
         {
+            ValidateAddress(organization, nameof(organization));
+            
             dynamic args = new JObject();
             args.organization = organization;
             return new RpcMessage("organizationSignup", args);
@@ -59,6 +71,9 @@ namespace Pathfinder.Server
 
         public static RpcMessage Trust(string canSendTo, string user, int limitPercentage)
         {
+            ValidateAddress(canSendTo, nameof(canSendTo));
+            ValidateAddress(user, nameof(user));
+            
             dynamic args = new JObject();
             args.canSendTo = canSendTo;
             args.user = user;
@@ -68,6 +83,10 @@ namespace Pathfinder.Server
 
         public static RpcMessage Transfer(string token, string from, string to, string value)
         {
+            ValidateAddress(token, nameof(token));
+            ValidateAddress(from, nameof(from));
+            ValidateAddress(to, nameof(to));
+            
             dynamic args = new JObject();
             args.token = token;
             args.from = from;
@@ -94,6 +113,8 @@ namespace Pathfinder.Server
 
         public static RpcMessage Adjacencies(string user)
         {
+            ValidateAddress(user, nameof(user));
+            
             dynamic args = new JObject();
             args.user = user;
             
@@ -102,6 +123,9 @@ namespace Pathfinder.Server
 
         public static RpcMessage Flow(string from, string to, string value)
         {
+            ValidateAddress(from, nameof(from));
+            ValidateAddress(to, nameof(to));
+            
             dynamic args = new JObject();
             args.from = from;
             args.to = to;

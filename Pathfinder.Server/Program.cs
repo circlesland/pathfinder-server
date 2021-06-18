@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Numerics;
 using System.Threading.Tasks;
 using Akka.Actor;
 using Nethereum.Web3;
+using Pathfinder.Server.contracts;
 
 namespace Pathfinder.Server
 {
@@ -24,25 +26,14 @@ namespace Pathfinder.Server
                                 }
                             }";
             
-            using (var system = ActorSystem.Create("pathfinder-system", config))
+            using (var system = ActorSystem.Create("system", config))
             {
-                var pathfinder = system.ActorOf(Actors.Pathfinder.Props(
-                    "/home/daniel/src/circles-world/PathfinderServer/PathfinderServer/Server/data/db.dat"
+                var main = system.ActorOf(Actors.Main.Props("https://rpc.circles.land"), "main");
+                
+                var pathfinder = system.ActorOf(Actors.PathfinderInstance.Props(
+                    "/home/daniel/src/pathfinder/build/pathfinder",
+                    "/home/daniel/src/circles-world/PathfinderServer/Pathfinder.Server/db.dat"
                 ), "pathfinder");
-
-                var eventSource = system.ActorOf(Actors.EventSource.Props(
-                    "https://rpc.circles.land", 5000, new[]
-                    {
-                        Web3.Sha3("Signup(address,address)"),
-                        Web3.Sha3("OrganizationSignup(address)"),
-                        Web3.Sha3("Trust(address,address,uint256)"),
-                        Web3.Sha3("Transfer(address,address,uint256)")
-                    }, new[] {pathfinder}), "eventSource");
-
-                var result = await Task.Delay(TimeSpan.FromSeconds(5))
-                    .ContinueWith((r) => pathfinder.Ask<Actors.Pathfinder.Return>(new Actors.Pathfinder.Call(
-                        RpcMessage.Flow("0xDE374ece6fA50e781E81Aac78e811b33D16912c7",
-                            "0x3A599ab30A17Bc7527D8BE6D434F3048eA92d5d7", "99999999999"), null)));
 
                 Console.ReadLine();
             }

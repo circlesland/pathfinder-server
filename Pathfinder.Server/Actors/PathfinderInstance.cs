@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Immutable;
+using System.IO;
 using Akka.Actor;
 using Akka.Event;
 using Newtonsoft.Json.Linq;
 
 namespace Pathfinder.Server.Actors
 {
-    public class Pathfinder : ReceiveActor
+    public class PathfinderInstance : ReceiveActor
     {
         #region Messages
         
@@ -59,16 +60,25 @@ namespace Pathfinder.Server.Actors
         private readonly IActorRef _processWrapper;
         private readonly string _databaseFile;
         
-        public Pathfinder(string databaseFile)
+        public PathfinderInstance(string executable, string databaseFile)
         {
+            if (!File.Exists(executable))
+            {
+                throw new FileNotFoundException($"Couldn't find the pathfinder executable at '{executable}'.");
+            }
+            
+            if (!File.Exists(databaseFile))
+            {
+                throw new FileNotFoundException($"Couldn't find the database file at '{databaseFile}'.");
+            }
+            _databaseFile = databaseFile;
+            
             _processWrapper = Context.ActorOf(ProcessWrapper.Props(
-                "/home/daniel/src/pathfinder/build/pathfinder",
+                executable,
                 new[] {"--json"}.ToImmutableArray(),
                 null,
                 Self
             ));
-
-            _databaseFile = databaseFile;
             
             Become(LoadDb);
         }
@@ -224,7 +234,7 @@ namespace Pathfinder.Server.Actors
             }
         }
 
-        public static Props Props(string databaseFile) 
-            => Akka.Actor.Props.Create<Pathfinder>(databaseFile);
+        public static Props Props(string executable, string databaseFile) 
+            => Akka.Actor.Props.Create<PathfinderInstance>(executable, databaseFile);
     }
 }
