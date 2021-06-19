@@ -18,8 +18,8 @@ namespace Pathfinder.Server.Actors
         
         private ILoggingAdapter Log { get; } = Context.GetLogger();
 
-        protected override void PreStart() => Log.Info($"BlockchainEventQuery started.");
-        protected override void PostStop() => Log.Info($"BlockchainEventQuery stopped.");
+        protected override void PreStart() => Log.Debug($"BlockchainEventQuery started.");
+        protected override void PostStop() => Log.Debug($"BlockchainEventQuery stopped.");
 
         private readonly Web3 _web3;
         private readonly HexBigInteger _from;
@@ -69,8 +69,11 @@ namespace Pathfinder.Server.Actors
 
                 if (n > 0)
                 {
-                    Log.Info($"Publish: Sending a 'List<EventLog<{t}>>' with {n} elements to '{_answerTo}' ..");
-                    _answerTo.Tell(message);
+                    Log.Info($"Publish: Sending all {n} items of the received 'List<EventLog<{t}>>' to '{_answerTo}' ..");
+                    foreach (var eventLog in message)
+                    {
+                        _answerTo.Tell(eventLog);   
+                    }
                 }
                 else
                 {

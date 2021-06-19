@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Numerics;
 using Akka.Actor;
 using Akka.Event;
 using Nethereum.ABI.FunctionEncoding.Attributes;
@@ -22,17 +23,30 @@ namespace Pathfinder.Server.Actors
         private HexBigInteger? _latestBlock;
         private HexBigInteger? _fetchingBlock;
 
+        private readonly IActorRef _eventBuffer;
+
         protected override SupervisorStrategy SupervisorStrategy()
         {
-            // Immediately stop failing child actors.
-            // Simply wait for the next round and extend the next request by the amount of missed blocks.
-            return new OneForOneStrategy(0, 0, ex => Directive.Stop);
+            return new OneForOneStrategy(0, 0, ex =>
+            {
+                if (!Sender.Equals(_eventBuffer))
+                {
+                    // Immediately stop all other failing child actors and simply wait for the next round.
+                    return Directive.Stop;
+                }
+             
+                // Failing _eventBuffers are fatal.   
+                Log.Error(ex, $"The {nameof(BlockchainEventBuffer)} of this {GetType().Name} failed.");
+                return Directive.Escalate;
+            });
         }
 
         public BlockchainEventSource(string rpcGateway)
         {
             _rpcGateway = rpcGateway;
             _web3 = new Web3(_rpcGateway);
+
+            _eventBuffer = Context.ActorOf(BlockchainEventBuffer.Props());
             
             Context.System.EventStream.Subscribe(Self, typeof(BlockClock.NextBlock));
             Log.Info($"Subscribed to BlockClock.NextBlock.");
@@ -48,11 +62,6 @@ namespace Pathfinder.Server.Actors
                 Become(Fetch);
                 
                 Self.Tell(message.BlockNo);
-            });
-
-            Receive<Terminated>(message =>
-            {
-                Log.Debug("Query worker terminated.");
             });
         }
 
@@ -73,12 +82,14 @@ namespace Pathfinder.Server.Actors
                     return;
                 }
                 
-                Log.Debug($"Fetch: Latest known block: {message}. Fetching from {_latestBlock} to {message} ..");
-                
                 // The BlockchainEventQuery actor sends a List<EventLog<TEventDTO>> with the results to Self
-                var worker = Context.ActorOf(BlockchainEventQuery<TEventDTO>.Props(Self, _rpcGateway, _latestBlock, message));
-                Context.Watch(worker);
+                var nextBlock = BigInteger.Parse(_latestBlock.ToString()) + 1;
+                Log.Debug($"Fetch: From {nextBlock} to {message} ..");
                 
+                var worker = Context.ActorOf(
+                    BlockchainEventQuery<TEventDTO>.Props(_eventBuffer, _rpcGateway, nextBlock.ToHexBigInteger(), message));
+                
+                Context.Watch(worker);
                 _fetchingBlock = message;
                 
                 Become(Publish);
@@ -87,38 +98,24 @@ namespace Pathfinder.Server.Actors
 
         void Publish()
         {
-            Receive<BlockchainEventQuery<TEventDTO>.Empty>(message =>
+            ReceiveAsync<Terminated>(async message =>
             {
-                _latestBlock = _fetchingBlock;
-                _fetchingBlock = null;
+                var stats = await _eventBuffer.Ask<BlockchainEventBuffer.GetStatsResult>(
+                    new BlockchainEventBuffer.GetStats());
                 
-                Log.Debug($"Publish: No events to publish.");
-                Become(Wait);
-            });
-            
-            Receive<List<EventLog<TEventDTO>>>(message =>
-            {
-                _latestBlock = _fetchingBlock;
-                _fetchingBlock = null;
-                
-                var n = message.Count;
-                var t = typeof(TEventDTO).Name;
-
-                Log.Info($"Publish: publishing {n} 'EventLog<{t}>' messages to the EventStream ..");
-                foreach (var eventLog in message)
+                if (stats.Items > 0)
                 {
-                    Context.System.EventStream.Publish(eventLog);
+                    Log.Info($"Publish: The query worker received {stats.Items} events in the range from {stats.MinKey} to {stats.MaxKey}. Publishing the events and going back to Wait() ..");
+                    _latestBlock = _fetchingBlock;
+                    
+                    _eventBuffer.Tell(new Buffer.Publish());
                 }
-                Log.Debug($"Publish: publishing {n} 'EventLog<{t}>' messages to the EventStream .. Done.");
-
-                Become(Wait);
-            });
-            
-            Receive<Terminated>(message =>
-            {
-                _fetchingBlock = null;
+                else
+                {
+                    Log.Debug($"Publish: The query worker terminated without a result. Going back to Wait().");
+                }
                 
-                Log.Warning($"Publish: The query worker terminated without a result. Going back to Wait().");
+                _fetchingBlock = null;
                 Become(Wait);
             });
         }

@@ -22,15 +22,10 @@ namespace Pathfinder.Server
                                       unhandled = on
                                 }
                             }";
-            
+
             using (var system = ActorSystem.Create("system", config))
             {
-                var main = system.ActorOf(Actors.Server.Props("https://rpc.circles.land"), "main");
-                
-                var pathfinder = system.ActorOf(Actors.Pathfinder.Props(
-                    "/home/daniel/src/pathfinder/build/pathfinder",
-                    "/home/daniel/src/circles-world/PathfinderServer/Pathfinder.Server/db.dat"
-                ), "pathfinder");
+                var main = system.ActorOf(Actors.Server.Props(), "main");
 
                 Console.ReadLine();
             }
