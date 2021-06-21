@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+using System;
 using System.Numerics;
 using Akka.Actor;
 using Akka.Event;
@@ -6,8 +6,9 @@ using Nethereum.ABI.FunctionEncoding.Attributes;
 using Nethereum.Contracts;
 using Nethereum.Hex.HexTypes;
 using Nethereum.Web3;
+using Buffer = Pathfinder.Server.Actors.MessageContracts.Buffer;
 
-namespace Pathfinder.Server.Actors
+namespace Pathfinder.Server.Actors.Chain
 {
     public class BlockchainEventSource<TEventDTO> : ReceiveActor
         where TEventDTO : IEventDTO, new()
@@ -36,7 +37,7 @@ namespace Pathfinder.Server.Actors
                 }
              
                 // Failing _eventBuffers are fatal.   
-                Log.Error(ex, $"The {nameof(BlockchainEventBuffer)} of this {GetType().Name} failed.");
+                Log.Error(ex, $"The {nameof(EventBuffer<Tuple<BigInteger,BigInteger>, IEventLog>)} of this {GetType().Name} failed.");
                 return Directive.Escalate;
             });
         }
@@ -46,7 +47,11 @@ namespace Pathfinder.Server.Actors
             _rpcGateway = rpcGateway;
             _web3 = new Web3(_rpcGateway);
 
-            _eventBuffer = Context.ActorOf(BlockchainEventBuffer.Props());
+            _eventBuffer = Context.ActorOf(EventBuffer<Tuple<BigInteger,BigInteger>, IEventLog>.Props(
+                    log => Tuple.Create(
+                        BigInteger.Parse(log.Log.BlockNumber.ToString()), 
+                        BigInteger.Parse(log.Log.LogIndex.ToString()))),
+                "eventBuffer");
             
             Context.System.EventStream.Subscribe(Self, typeof(BlockClock.NextBlock));
             Log.Info($"Subscribed to BlockClock.NextBlock.");
@@ -100,8 +105,8 @@ namespace Pathfinder.Server.Actors
         {
             ReceiveAsync<Terminated>(async message =>
             {
-                var stats = await _eventBuffer.Ask<BlockchainEventBuffer.GetStatsResult>(
-                    new BlockchainEventBuffer.GetStats());
+                var stats = await _eventBuffer.Ask<EventBuffer<Tuple<BigInteger,BigInteger>, IEventLog>.GetStatsResult>(
+                    new EventBuffer<Tuple<BigInteger,BigInteger>, IEventLog>.GetStats());
                 
                 if (stats.Items > 0)
                 {

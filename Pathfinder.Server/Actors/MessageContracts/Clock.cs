@@ -1,6 +1,4 @@
-using System;
-
-namespace Pathfinder.Server.Actors
+namespace Pathfinder.Server.Actors.MessageContracts
 {
     public class Clock
     {

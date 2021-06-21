@@ -1,11 +1,10 @@
-using System;
 using System.Numerics;
 using Akka.Actor;
 using Akka.Event;
 using Nethereum.Hex.HexTypes;
 using Newtonsoft.Json.Linq;
 
-namespace Pathfinder.Server.Actors
+namespace Pathfinder.Server.Actors.Pathfinder
 {
     public class PathfinderInitializer : ReceiveActor
     {
@@ -54,10 +53,13 @@ namespace Pathfinder.Server.Actors
                 _latestKnownBlock = (ulong)result.blockNumber;
                 
                 Log.Info("LoadDb() - Success");
-                Become(PerformEdgeUpdate);
+                
+                //Become(PerformEdgeUpdate);
+                _answerTo.Tell(new Done(_latestKnownBlock.Value.ToHexBigInteger()));
+                Context.Stop(Self);
             });
         }
-
+/*
         void PerformEdgeUpdate()
         {
             Log.Info("PerformEdgeUpdate()");
@@ -75,6 +77,7 @@ namespace Pathfinder.Server.Actors
                 Context.Stop(Self);
             });
         }
+*/
         
         public static Props Props(IActorRef pathfinder, string databaseFile) 
             => Akka.Actor.Props.Create<PathfinderInitializer>(pathfinder, databaseFile);

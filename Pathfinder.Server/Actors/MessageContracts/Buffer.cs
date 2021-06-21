@@ -1,7 +1,8 @@
 using Akka.Actor;
 using Akka.Event;
+using Pathfinder.Server.Actors.Feed;
 
-namespace Pathfinder.Server.Actors
+namespace Pathfinder.Server.Actors.MessageContracts
 {
     public class Buffer
     {
@@ -29,10 +30,12 @@ namespace Pathfinder.Server.Actors
         public sealed class Feed : EmptyBuffer
         {
             public readonly IActorRef To;
+            public readonly FeedMode FeedMode;
 
-            public Feed(IActorRef to)
+            public Feed(IActorRef to, FeedMode feedMode)
             {
                 To = to;
+                FeedMode = feedMode;
             }
         }
         

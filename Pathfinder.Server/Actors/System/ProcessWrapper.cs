@@ -5,7 +5,7 @@ using System.Linq;
 using Akka.Actor;
 using Akka.Event;
 
-namespace Pathfinder.Server.Actors
+namespace Pathfinder.Server.Actors.System
 {
     public class ProcessWrapper : ReceiveActor
     {

@@ -1,8 +1,10 @@
 using System;
 using System.IO;
 using Akka.Actor;
+using Pathfinder.Server.Actors.Feed;
+using Buffer = Pathfinder.Server.Actors.MessageContracts.Buffer;
 
-namespace Pathfinder.Server.Actors
+namespace Pathfinder.Server.Actors.Pathfinder
 {
     public class Pathfinder : ReceiveActor
     {
@@ -33,7 +35,7 @@ namespace Pathfinder.Server.Actors
         }
 
         private bool _pathfinderInitializerDone;
-        private bool _feedderCaughtUp;
+        private bool _feederCaughtUp;
         
         void Starting()
         {
@@ -69,11 +71,11 @@ namespace Pathfinder.Server.Actors
             Receive<PathfinderFeeder.CaughtUp>(_ =>
             {
                 // The feeder now has all relevant events up to the most recent block in its buffer.
-                _feedderCaughtUp = true;
+                _feederCaughtUp = true;
                 
-                // Set "Feeding" mode and unroll all buffered events to the process.
+                // Tell the Feeder to feed all events of it's internal buffer to the pathfinder.
                 Become(Feeding);
-                _pathfinderFeeder.Tell(new Buffer.Unroll(_pathfinderProcess));
+                _pathfinderFeeder.Tell(new Buffer.Feed(_pathfinderProcess, FeedMode.Finite));
             });
         }
         

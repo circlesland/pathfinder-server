@@ -1,6 +1,7 @@
 using Akka.Actor;
 using Akka.Event;
-using Nethereum.Contracts;
+using Pathfinder.Server.Actors.Chain;
+using Pathfinder.Server.Actors.System;
 using Pathfinder.Server.contracts;
 
 namespace Pathfinder.Server.Actors
@@ -36,7 +37,7 @@ namespace Pathfinder.Server.Actors
             _trustEventSource = Context.ActorOf(BlockchainEventSource<TrustEventDTO>.Props(rpcGateway), "TrustEventSource");
             _transferEventSource = Context.ActorOf(BlockchainEventSource<TransferEventDTO>.Props(rpcGateway), "TransferEventSource");
             
-            _pathfinder = Context.ActorOf(Pathfinder.Props(executable, dbFile, rpcGateway), "Pathfinder");
+            _pathfinder = Context.ActorOf(Pathfinder.Pathfinder.Props(executable, dbFile, rpcGateway), "Pathfinder");
         }
         
         protected override void OnReceive(object message)

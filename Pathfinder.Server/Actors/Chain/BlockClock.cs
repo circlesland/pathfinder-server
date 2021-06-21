@@ -2,8 +2,10 @@ using Akka.Actor;
 using Akka.Event;
 using Nethereum.Hex.HexTypes;
 using Nethereum.Web3;
+using Pathfinder.Server.Actors.MessageContracts;
+using Pathfinder.Server.Actors.System;
 
-namespace Pathfinder.Server.Actors
+namespace Pathfinder.Server.Actors.Chain
 {
     public class BlockClock : UntypedActor
     {
@@ -27,7 +29,7 @@ namespace Pathfinder.Server.Actors
         protected override void PostStop() => Log.Info($"BlockClock stopped.");
 
         private readonly string _rpcGateway;
-        private HexBigInteger _lastBlock;
+        private HexBigInteger? _lastBlock;
 
         public BlockClock(string rpcGateway)
         {

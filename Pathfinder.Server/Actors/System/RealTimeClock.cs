@@ -2,7 +2,7 @@ using System;
 using Akka.Actor;
 using Akka.Event;
 
-namespace Pathfinder.Server.Actors
+namespace Pathfinder.Server.Actors.System
 {
     public class RealTimeClock : UntypedActor
     {

@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Akka.Actor;
+using Pathfinder.Server.Actors.Feed;
 
 namespace Pathfinder.Server
 {
     class Program
     {
-        // const string hubAddress = "0x29b9a7fBb8995b2423a71cC17cf9810798F6C543";
-
         static async Task Main()
         {
             var config = @"akka {  
@@ -23,10 +22,18 @@ namespace Pathfinder.Server
                                 }
                             }";
 
-            using (var system = ActorSystem.Create("system", config))
+            using (var system = ActorSystem.Create("system"/*, config*/))
             {
-                var main = system.ActorOf(Actors.Server.Props(), "main");
-
+                /*
+                var testConsumer = system.ActorOf(Consumer<DateTime>.Props(async (handshake, payload) =>
+                {
+                    //system.Log.Info(payload.ToString());
+                    return true;
+                }, FeedMode.Infinite), "TestConsumer");
+                
+                var testFeed = system.ActorOf(TestFeed.Props(testConsumer), "TestFeed");
+*/
+                system.ActorOf(Actors.Server.Props(), "main");
                 Console.ReadLine();
             }
         }

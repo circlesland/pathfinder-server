@@ -7,7 +7,7 @@ using Nethereum.Hex.HexTypes;
 using Nethereum.RPC.Eth.DTOs;
 using Nethereum.Web3;
 
-namespace Pathfinder.Server.Actors
+namespace Pathfinder.Server.Actors.Chain
 {
     public class BlockchainEventQuery<TEventDTO> : ReceiveActor
         where TEventDTO : IEventDTO, new()
