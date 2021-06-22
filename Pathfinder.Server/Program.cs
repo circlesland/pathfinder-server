@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Akka.Actor;
-using Pathfinder.Server.Actors.Feed;
 
 namespace Pathfinder.Server
 {
@@ -24,15 +23,6 @@ namespace Pathfinder.Server
 
             using (var system = ActorSystem.Create("system"/*, config*/))
             {
-                /*
-                var testConsumer = system.ActorOf(Consumer<DateTime>.Props(async (handshake, payload) =>
-                {
-                    //system.Log.Info(payload.ToString());
-                    return true;
-                }, FeedMode.Infinite), "TestConsumer");
-                
-                var testFeed = system.ActorOf(TestFeed.Props(testConsumer), "TestFeed");
-*/
                 system.ActorOf(Actors.Server.Props(), "main");
                 Console.ReadLine();
             }

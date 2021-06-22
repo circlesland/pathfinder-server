@@ -6,7 +6,6 @@ using Nethereum.Contracts;
 using Nethereum.Hex.HexTypes;
 using Pathfinder.Server.Actors.Chain;
 using Pathfinder.Server.Actors.Feed;
-using Pathfinder.Server.Actors.System;
 using Pathfinder.Server.contracts;
 using Buffer = Pathfinder.Server.Actors.MessageContracts.Buffer;
 
@@ -17,6 +16,9 @@ namespace Pathfinder.Server.Actors.Pathfinder
         #region Messages
 
         public sealed class CaughtUp
+        {
+        }
+        public sealed class Updated
         {
         }
 
@@ -62,6 +64,12 @@ namespace Pathfinder.Server.Actors.Pathfinder
             {
                 Become(Ready);
             }
+        }
+
+        protected override SupervisorStrategy SupervisorStrategy()
+        {
+            // If anything within the PathfinderFeeder dies, let the whole thing die
+            return new AllForOneStrategy(0, 0, ex => Directive.Escalate);
         }
 
         void CatchUp()
@@ -143,8 +151,7 @@ namespace Pathfinder.Server.Actors.Pathfinder
 
         void Ready()
         {
-            
-            Receive<Buffer.Feed>(message =>
+            Receive<Buffer.FeedToActor>(message =>
             {
                 // Prepare the pathfinder for bulk insert
                 _feedingTo = message.To;
@@ -158,15 +165,18 @@ namespace Pathfinder.Server.Actors.Pathfinder
                 _feedConsumer = Context.ActorOf(Consumer<IEventLog>.Props(
                     async (handshake, payload) =>
                     {
+                        // Convert all received events to pathfinder rpc calls
+                        // and execute them ..
                         var rpcCall = EventToCall(payload);
                         var rpcCallReturn = await _feedingTo.Ask<PathfinderProcess.Return>(rpcCall);
                         
                         return true;
                     }, FeedMode.Finite));
                 
-                _eventBuffer.Tell(new Buffer.Feed(_feedConsumer, FeedMode.Finite)); // TODO: Intentionally broken.. Continue here
+                _eventBuffer.Tell(new Buffer.FeedToActor(_feedConsumer, FeedMode.Finite)); // TODO: Intentionally broken.. Continue here
                 Context.Watch(_feedConsumer);
 
+                // Wait until the Consumer terminates ..
                 Become(Feeding);
             });
         }
@@ -185,6 +195,7 @@ namespace Pathfinder.Server.Actors.Pathfinder
             {
                 Log.Info($"Feeding finished. PathfinderProcess ({_feedingTo}) should now be up to date.");
                 _feedingTo = null;
+                Context.Parent.Tell(new Updated());
                 Become(Ready);
             });
         }

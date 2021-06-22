@@ -13,11 +13,11 @@ namespace Pathfinder.Server.Actors.MessageContracts
         /// <summary>
         /// Sends the buffered events one by one to the actor at the <see cref="To"/> address and clears the buffer.
         /// </summary>
-        public sealed class Unroll : EmptyBuffer
+        public sealed class DumpToActor : EmptyBuffer
         {
             public readonly IActorRef To;
 
-            public Unroll(IActorRef to)
+            public DumpToActor(IActorRef to)
             {
                 To = to;
             }
@@ -27,12 +27,12 @@ namespace Pathfinder.Server.Actors.MessageContracts
         /// When a buffer is fed to another actor then the items are "offered" one by one and
         /// the <see cref="To"/> actor "pulls" the offered item when its done with processing the current one.
         /// </summary>
-        public sealed class Feed : EmptyBuffer
+        public sealed class FeedToActor : EmptyBuffer
         {
             public readonly IActorRef To;
             public readonly FeedMode FeedMode;
 
-            public Feed(IActorRef to, FeedMode feedMode)
+            public FeedToActor(IActorRef to, FeedMode feedMode)
             {
                 To = to;
                 FeedMode = feedMode;
@@ -42,7 +42,7 @@ namespace Pathfinder.Server.Actors.MessageContracts
         /// <summary>
         /// Sends the buffered events one by one to the system's <see cref="EventStream"/> and clears the buffer.
         /// </summary>
-        public sealed class Publish : EmptyBuffer
+        public sealed class DumpToStream : EmptyBuffer
         {
         }
     }

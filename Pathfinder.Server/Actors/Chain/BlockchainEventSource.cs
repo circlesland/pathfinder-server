@@ -113,7 +113,7 @@ namespace Pathfinder.Server.Actors.Chain
                     Log.Info($"Publish: The query worker received {stats.Items} events in the range from {stats.MinKey} to {stats.MaxKey}. Publishing the events and going back to Wait() ..");
                     _latestBlock = _fetchingBlock;
                     
-                    _eventBuffer.Tell(new Buffer.Publish());
+                    _eventBuffer.Tell(new Buffer.DumpToStream());
                 }
                 else
                 {

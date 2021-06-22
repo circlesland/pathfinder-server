@@ -9,14 +9,14 @@ using Buffer = Pathfinder.Server.Actors.MessageContracts.Buffer;
 namespace Pathfinder.Server.Actors
 {
     public class EventBuffer<TKey, TValue> : UntypedActor
-        where TKey : IComparable 
+        where TKey : IComparable
     {
         #region Messages
 
         public sealed class GetStats
         {
         }
-        
+
         public sealed class GetStatsResult
         {
             public readonly TKey? MinKey;
@@ -33,7 +33,7 @@ namespace Pathfinder.Server.Actors
                 Items = items;
             }
         }
-        
+
         private class FindNext
         {
             public readonly TKey? CurrentKey;
@@ -43,6 +43,7 @@ namespace Pathfinder.Server.Actors
                 CurrentKey = currentKey;
             }
         }
+
         private class FindNextResponse
         {
             public readonly bool Eof;
@@ -53,26 +54,27 @@ namespace Pathfinder.Server.Actors
             {
                 Eof = true;
             }
-            
+
             public FindNextResponse(TKey key, TValue value)
             {
                 Key = key;
                 Value = value;
             }
         }
+
         private class RemoveAndFindNext : FindNext
         {
             public RemoveAndFindNext(TKey? currentKey) : base(currentKey)
             {
             }
         }
-        
+
         private class RemoveAndFindNextResponse : FindNextResponse
         {
             public readonly bool Removed;
 
             public RemoveAndFindNextResponse(bool removed, TKey key, TValue value)
-                :base(key, value)
+                : base(key, value)
             {
                 Removed = removed;
             }
@@ -85,26 +87,30 @@ namespace Pathfinder.Server.Actors
         }
 
         #endregion
-        
+
         private ILoggingAdapter Log { get; } = Context.GetLogger();
-        
-        protected override void PreStart() => Log.Info($"EventBuffer<{typeof(TKey).Name}, {typeof(TValue).Name}> started.");
-        protected override void PostStop() => Log.Info($"EventBuffer<{typeof(TKey).Name}, {typeof(TValue).Name}> stopped.");
-        
+
+        protected override void PreStart() =>
+            Log.Info($"EventBuffer<{typeof(TKey).Name}, {typeof(TValue).Name}> started.");
+
+        protected override void PostStop() =>
+            Log.Info($"EventBuffer<{typeof(TKey).Name}, {typeof(TValue).Name}> stopped.");
+
         private readonly SortedList<TKey, TValue> _buffer = new();
-        
+
         public delegate TKey GetKey(TValue log);
+
         private readonly GetKey _keyExtractor;
 
         private IActorRef? _feedActor;
-        
+
         public EventBuffer(GetKey keyExtractor)
         {
             _keyExtractor = keyExtractor;
         }
 
         protected override void OnReceive(object message)
-        {   
+        {
             switch (message)
             {
                 // Check if the message is a collectible event
@@ -112,12 +118,14 @@ namespace Pathfinder.Server.Actors
                     var key = _keyExtractor(item);
                     if (_buffer.ContainsKey(key))
                     {
-                        Log.Warning($"Received duplicate '{typeof(TValue).Name}' with key '{key}' from '{Sender}'. Ignoring it ..");
+                        Log.Warning(
+                            $"Received duplicate '{typeof(TValue).Name}' with key '{key}' from '{Sender}'. Ignoring it ..");
                         return;
                     }
+
                     _buffer.Add(key, item);
                     break;
-                
+
                 // Check if the message is a command
                 case GetStats:
                     if (_buffer.Count == 0)
@@ -126,9 +134,10 @@ namespace Pathfinder.Server.Actors
                             default,
                             default,
                             0));
-                        
+
                         return;
                     }
+
                     Sender.Tell(new GetStatsResult(
                         _buffer.First().Key,
                         _buffer.Last().Key, // TODO: Find a better way for _buffer.Last() if this is called often
@@ -174,30 +183,35 @@ namespace Pathfinder.Server.Actors
                     }
                 }
                     break;
-                    break;
-                case Buffer.Unroll unroll:
+                case Buffer.DumpToActor unroll:
                     foreach (var item in _buffer)
                     {
                         unroll.To.Tell(item.Value);
                     }
+
                     Log.Info($"{Sender} unrolled the contents of the buffer ({_buffer.Count} items) to {unroll.To}.");
                     _buffer.Clear();
                     break;
-                case Buffer.Publish:
+                case Buffer.DumpToStream:
                     foreach (var item in _buffer)
                     {
                         Context.System.EventStream.Publish(item.Value);
                     }
+
                     Log.Info($"{Sender} published the contents of the buffer ({_buffer.Count} items) to the EventStream.");
                     _buffer.Clear();
                     break;
-                case Buffer.Feed {FeedMode: FeedMode.Finite} finiteFeed:
+                case Buffer.FeedToActor {FeedMode: FeedMode.Finite} finiteFeed:
                     if (_feedActor != null)
                     {
                         throw new InvalidOperationException("There is already an open feed.");
                     }
+
                     IActorRef self = Self;
-                    TKey? lastKey = default; // TODO: This variable is updated from a different actor. Should be o.k. tough because its local and no one else uses it
+                    TKey? lastKey = default; // TODO: This variable is updated from a different actor.
+                                             // Should be o.k. tough because its local and no one else uses it.
+                                             // When the checks (described below) should be implemented this must change.
+                    
                     _feedActor = Context.ActorOf(Feed<TValue>.Props(
                         finiteFeed.To,
                         async (handshake) =>
@@ -213,26 +227,33 @@ namespace Pathfinder.Server.Actors
                             // Send item
                             lastKey = item.Key;
                             return new FactoryResult(item.Value);
-                        }, 
+                        },
                         FeedMode.Finite,
                         TimeSpan.FromSeconds(2) /* TODO: Make timeouts configurable */,
                         null));
-                    
-                        // TODO:
-                        // Unrolls the buffer one by one using a Feed.
-                        // This allows new events to come in while the
-                        // buffer is emptied.
-                        // If more new events stream in than can be
-                        // consumed, the Feed will never EOF.
-                        // If the buffer is emptied completely the Feed EOFs.
-                        // !! There can be only one active feed per buffer at a time
-                        // !! When there is an active feed then no events that happened
-                        //    prior to the last streamed event can be added. Doing so
-                        //    will cause the buffer to crash.
+
+                    Context.Watch(_feedActor);
+                    // TODO:
+                    // Unrolls the buffer one by one using a Feed.
+                    // This allows new events to come in while the
+                    // buffer is emptied.
+                    // If more new events stream in than can be
+                    // consumed, the Feed will never EOF.
+                    // If the buffer is emptied completely the Feed EOFs.
+                    // !! There can be only one active feed per buffer at a time
+                    // !! When there is an active feed then no events that happened
+                    //    prior to the last streamed event can be added. Doing so
+                    //    will cause the buffer to crash.
+                    break;
+                case Terminated terminated:
+                    if (_feedActor != null && _feedActor.Equals(terminated.ActorRef))
+                    {
+                        _feedActor = null;
+                    }
                     break;
             }
         }
-        
+
         public static Props Props(GetKey keyExtractor)
             => Akka.Actor.Props.Create<EventBuffer<TKey, TValue>>(keyExtractor);
     }

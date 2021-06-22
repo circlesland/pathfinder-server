@@ -37,12 +37,10 @@ namespace Pathfinder.Server.Actors.Pathfinder
 
         public sealed class Return
         {
-            public readonly RpcMessage RpcMessage;
             public readonly string ResultJson;
 
-            public Return(RpcMessage rpcMessage, string resultJson)
+            public Return(string resultJson)
             {
-                RpcMessage = rpcMessage;
                 ResultJson = resultJson;
             }
         }
@@ -51,13 +49,18 @@ namespace Pathfinder.Server.Actors.Pathfinder
 
         private ILoggingAdapter Log { get; } = Context.GetLogger();
 
-        protected override void PostStop() => Log.Info("Pathfinder stopped");
-        protected override void PreStart() => Log.Info("Pathfinder started.");
+        protected override void PostStop() => Log.Info("PathfinderProcess stopped");
+        protected override void PreStart() => Log.Info("PathfinderProcess started.");
 
         private readonly IActorRef _processWrapper;
-
-
+        
         private List<string> _callLog;
+
+        protected override SupervisorStrategy SupervisorStrategy()
+        {
+            // If anything within the PathfinderProcess dies, let the whole thing die
+            return new AllForOneStrategy(0, 0, ex => Directive.Escalate);
+        }
 
         public PathfinderProcess(string executable)
         {
@@ -109,7 +112,7 @@ namespace Pathfinder.Server.Actors.Pathfinder
                     throw new Exception($"The '{_lastCall.RpcMessage.Cmd}' call failed: {message.ResultJson}");
                 }
 
-                (_lastCall.AnswerTo ?? _lastCallSender).Tell(new Return(_lastCall.RpcMessage, message.ResultJson));
+                (_lastCall.AnswerTo ?? _lastCallSender).Tell(new Return(message.ResultJson));
                 _lastCall = null;
                 Become(Ready);
             });
@@ -128,6 +131,13 @@ namespace Pathfinder.Server.Actors.Pathfinder
             Receive<ProcessWrapper.StdErr>(message =>
             {
                 Log.Debug($"Ready: ProcessWrapper StdErr: {message.Data}");
+            });
+            
+            Receive<ProcessWrapper.Exited>(message =>
+            {
+                var errorMessage = $"Process exited unexpected with code {message.ExitCode}.";
+                Log.Error(errorMessage);
+                throw new Exception(errorMessage);
             });
         }
 
@@ -177,7 +187,7 @@ namespace Pathfinder.Server.Actors.Pathfinder
                 }
 
                 Log.Info("Calling '{0}': Return: {1}", _lastCall.RpcMessage.Cmd, message.Data);
-                (_lastCall.AnswerTo ?? _lastCallSender).Tell(new Return(_lastCall.RpcMessage, message.Data));
+                (_lastCall.AnswerTo ?? _lastCallSender).Tell(new Return(message.Data));
 
                 UnbecomeStacked();
 
@@ -203,7 +213,7 @@ namespace Pathfinder.Server.Actors.Pathfinder
                 }
 
                 var errorMessage =
-                    $"Calling '{_lastCall.RpcMessage.Cmd}': Process exited with code {message.ExitCode}.";
+                    $"Calling '{_lastCall.RpcMessage.Cmd}': Process exited unexpected with code {message.ExitCode}.";
                 
                 _callLog.Add(errorMessage);
                 Log.Error(errorMessage);

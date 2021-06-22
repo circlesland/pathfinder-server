@@ -54,30 +54,10 @@ namespace Pathfinder.Server.Actors.Pathfinder
                 
                 Log.Info("LoadDb() - Success");
                 
-                //Become(PerformEdgeUpdate);
                 _answerTo.Tell(new Done(_latestKnownBlock.Value.ToHexBigInteger()));
                 Context.Stop(Self);
             });
         }
-/*
-        void PerformEdgeUpdate()
-        {
-            Log.Info("PerformEdgeUpdate()");
-            
-            _pathfinder.Tell(new PathfinderProcess.Call(RpcMessage.PerformEdgeUpdates(), Self));
-            Receive<PathfinderProcess.Return>(message =>
-            {
-                if (_latestKnownBlock == null)
-                {
-                    throw new Exception("_latestKnownBlock == null");
-                }
-                
-                Log.Info($"PerformEdgeUpdate() - Success. Sending {nameof(Done)} to {_answerTo} ..");
-                _answerTo.Tell(new Done(_latestKnownBlock.Value.ToHexBigInteger()));
-                Context.Stop(Self);
-            });
-        }
-*/
         
         public static Props Props(IActorRef pathfinder, string databaseFile) 
             => Akka.Actor.Props.Create<PathfinderInitializer>(pathfinder, databaseFile);
