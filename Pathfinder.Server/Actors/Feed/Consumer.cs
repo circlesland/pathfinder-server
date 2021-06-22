@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Threading.Tasks;
 using Akka.Actor;
 using Akka.Event;
@@ -77,6 +78,9 @@ namespace Pathfinder.Server.Actors.Feed
             });
         }
 
+        private TPayload _last;
+        private TPayload _lastSuccess;
+        
         void Ready()
         {
             Log.Debug("Ready. Asking for the next item ..");
@@ -87,8 +91,9 @@ namespace Pathfinder.Server.Actors.Feed
                 Log.Debug($"Received new TPayload event: {message}");
 
                 var sinkTask = _sink(_handshake, message);
-                sinkTask.PipeTo(Self);         
-                
+                sinkTask.PipeTo(Self);
+                _last = message;
+
                 Become(WaitingForSink);
             });
             
@@ -115,11 +120,13 @@ namespace Pathfinder.Server.Actors.Feed
                 if (!message)
                 {
                     Log.Info($"The sink wants to cancel the feed subscription.");
+                    _lastSuccess = _last;
                     Become(Cancel);
                     return;
                 }
                 
                 Log.Debug($"The sink successfully processed the item. Requesting next item ..");
+                _lastSuccess = _last;
                 Become(Ready);
             });
             Receive<Status.Failure>(message =>

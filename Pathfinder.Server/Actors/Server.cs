@@ -4,10 +4,10 @@ using System.Linq;
 using System.Numerics;
 using Akka.Actor;
 using Akka.Event;
+using Akka.Util.Internal;
 using Nethereum.ABI.FunctionEncoding.Attributes;
 using Nethereum.Contracts;
 using Nethereum.Hex.HexTypes;
-using Nethereum.RPC.Eth.DTOs;
 using Newtonsoft.Json.Linq;
 using Pathfinder.Server.Actors.Chain;
 using Pathfinder.Server.Actors.Pathfinder;
@@ -23,19 +23,20 @@ namespace Pathfinder.Server.Actors
         protected override void PreStart() => Log.Info($"Main started.");
         protected override void PostStop() => Log.Info($"Main stopped.");
 
-        private readonly IActorRef _realTimeClock;
-        private readonly IActorRef _blockClock;
+        private IActorRef? _catchUpBuffer;
         
-        private readonly IActorRef _signupEventSource;
-        private readonly IActorRef _organizationSignupEventSource;
-        private readonly IActorRef _trustEventSource;
-        private readonly IActorRef _transferEventSource;
+        private readonly Dictionary<IActorRef, string> _catchUpQueries = new ();
+        private readonly Dictionary<IActorRef, IActorRef> _pathfinderProcessAndBuffer = new();
+        private readonly Dictionary<IActorRef, IActorRef> _initializerAndPathfinderProcess = new();
+        private readonly Dictionary<IActorRef, IActorRef> _feederAndPathfinderProcess = new();
+        private readonly Dictionary<IActorRef, bool> _pathfinderAvailability = new();
+        private readonly Dictionary<IActorRef, BigInteger> _pathfinderLastUpdateAtBlock = new();
+        private readonly Dictionary<IActorRef, IActorRef> _updateFeederAndPathfinder = new();
 
-        private IActorRef? _eventBuffer;
+        private int _targetPathfinders = 16;
+        private int _maxParalellUpdates = 2;
+        private int _spawningPathfinders = 0;
         
-        private readonly Dictionary<IActorRef, bool> _pathfinders = new();
-
-        private int _missingPathfinders = 2;
         private BigInteger? _lastBlockInDb;
         
         string _executable = "/home/daniel/src/pathfinder/build/pathfinder";
@@ -47,7 +48,7 @@ namespace Pathfinder.Server.Actors
             // If anything within the PathfinderFeeder dies, let the whole thing die
             return new OneForOneStrategy(2, 5000, ex =>
             {
-                if (Sender.Equals(_eventBuffer))
+                if (Sender.Equals(_catchUpBuffer))
                 {
                     // We're dead..
                     // Since all pathfinders use the same shared buffer but have
@@ -67,18 +68,20 @@ namespace Pathfinder.Server.Actors
                 return Directive.Escalate;
             });
         }
-        
-        public Server()
-        {
-            _realTimeClock = Context.ActorOf(RealTimeClock.Props(), "RealTimeClock");
-            _blockClock = Context.ActorOf(BlockClock.Props(_rpcGateway), "BlockClock");
-            
-            _signupEventSource = Context.ActorOf(BlockchainEventSource<SignupEventDTO>.Props(_rpcGateway), "SignupEventSource");
-            _organizationSignupEventSource = Context.ActorOf(BlockchainEventSource<OrganizationSignupEventDTO>.Props(_rpcGateway), "OrganizationSignupEventSource");
-            _trustEventSource = Context.ActorOf(BlockchainEventSource<TrustEventDTO>.Props(_rpcGateway), "TrustEventSource");
-            _transferEventSource = Context.ActorOf(BlockchainEventSource<TransferEventDTO>.Props(_rpcGateway), "TransferEventSource");
 
-            SpawnNextPathfinder();
+        private readonly IActorRef _nancyAdapterActor;
+        
+        public Server(IActorRef nancyAdapterActor)
+        {
+            _nancyAdapterActor = nancyAdapterActor;
+            
+            Context.ActorOf(RealTimeClock.Props(), "RealTimeClock");
+            Context.ActorOf(BlockClock.Props(_rpcGateway), "BlockClock");
+            
+            Context.ActorOf(BlockchainEventSource<SignupEventDTO>.Props(_rpcGateway), "SignupEventSource");
+            Context.ActorOf(BlockchainEventSource<OrganizationSignupEventDTO>.Props(_rpcGateway), "OrganizationSignupEventSource");
+            Context.ActorOf(BlockchainEventSource<TrustEventDTO>.Props(_rpcGateway), "TrustEventSource");
+            Context.ActorOf(BlockchainEventSource<TransferEventDTO>.Props(_rpcGateway), "TransferEventSource");
             
             Become(Starting);
         }
@@ -111,7 +114,7 @@ namespace Pathfinder.Server.Actors
                                             $"rpcGateway: {_rpcGateway}");
                     }
                 }
-                if (message.ActorRef.Equals(_eventBuffer))
+                if (message.ActorRef.Equals(_catchUpBuffer))
                 {
                     throw new Exception($"The Buffer was Terminated.");
                 }
@@ -134,34 +137,34 @@ namespace Pathfinder.Server.Actors
                 
                 // Start a buffer and fill it with all events from _latestKnownBlock to now afterwards.
                 // When the buffer is filled up to the requested block then the first user-facing instance is started.
-                _eventBuffer = Context.ActorOf(EventBuffer<Tuple<BigInteger, BigInteger>, IEventLog>.Props(
+                _catchUpBuffer = Context.ActorOf(EventBuffer<Tuple<BigInteger, BigInteger>, IEventLog>.Props(
                         log => Tuple.Create(
                             BigInteger.Parse(log.Log.BlockNumber.ToString()),
                             BigInteger.Parse(log.Log.LogIndex.ToString()))),
-                    "eventBuffer");
+                    "_catchUpBuffer");
 
                 // Watch the buffer, it shouldn't ever die ..
-                Context.Watch(_eventBuffer);
+                Context.Watch(_catchUpBuffer);
                 
                 // Start to fill the buffer
                 Become(CatchingUp);
             });
         }
 
-        readonly Dictionary<IActorRef, string> _catchUpQueries = new ();
-        
         void CatchingUp()
         {
             Log.Info("CatchingUp");
             
             Log.Info($"Subscribing the EventBuffer to all relevant events ..");
-            Context.System.EventStream.Subscribe<EventLog<SignupEventDTO>>(_eventBuffer);
-            Context.System.EventStream.Subscribe<EventLog<OrganizationSignupEventDTO>>(_eventBuffer);
-            Context.System.EventStream.Subscribe<EventLog<TrustEventDTO>>(_eventBuffer);
-            Context.System.EventStream.Subscribe<EventLog<TransferEventDTO>>(_eventBuffer);
+            Context.System.EventStream.Subscribe<EventLog<SignupEventDTO>>(_catchUpBuffer);
+            Context.System.EventStream.Subscribe<EventLog<OrganizationSignupEventDTO>>(_catchUpBuffer);
+            Context.System.EventStream.Subscribe<EventLog<TrustEventDTO>>(_catchUpBuffer);
+            Context.System.EventStream.Subscribe<EventLog<TransferEventDTO>>(_catchUpBuffer);
             
             Log.Info($"Waiting for the next block (which defines our catch-up goal) ..");
             Context.System.EventStream.Subscribe(Self, typeof(BlockClock.NextBlock));
+
+            var waitForQueries = false;
             
             Receive<BlockClock.NextBlock>(message =>
             {
@@ -174,14 +177,25 @@ namespace Pathfinder.Server.Actors
                 }
 
                 // Start all catch up queries and then wait for their completion
-                CatchUpQuery<SignupEventDTO>("CatchUp_Signups", message);
-                CatchUpQuery<OrganizationSignupEventDTO>("CatchUp_OrganisationSignups", message);
-                CatchUpQuery<TrustEventDTO>("CatchUp_Trusts", message);
-                CatchUpQuery<TransferEventDTO>("CatchUp_Transfers", message);
+                var q = CatchUpQuery<SignupEventDTO>("CatchUp_Signups", message);
+                Context.Watch(q);
+                
+                q = CatchUpQuery<OrganizationSignupEventDTO>("CatchUp_OrganisationSignups", message);
+                Context.Watch(q);
+                
+                q = CatchUpQuery<TrustEventDTO>("CatchUp_Trusts", message);
+                Context.Watch(q);
+                
+                q = CatchUpQuery<TransferEventDTO>("CatchUp_Transfers", message);
+                Context.Watch(q);
+
+                waitForQueries = true;
             });
 
             Receive<Terminated>(message =>
             {
+                if (!waitForQueries) return;
+                
                 // Check if the started queries completed ..
                 if (_catchUpQueries.TryGetValue(message.ActorRef, out var name))
                 {
@@ -192,65 +206,261 @@ namespace Pathfinder.Server.Actors
                 if (_catchUpQueries.Count == 0)
                 {
                     // All catch-up queries completed
+                    Context.System.EventStream.Subscribe<RealTimeClock.SecondElapsed>(Self);
                     Become(Started);
                 }
             });
         }
-
+        
         void Started()
         {
+            Context.System.EventStream.Subscribe(Self, typeof(BlockClock.NextBlock));
             Log.Info("Started");
             
-            // Start the first pathfinder instance which is meant to serve user requests ..
-            Log.Info($"Starting the first pathfinder ..");
-            SpawnNextPathfinder();
+            Receive<RealTimeClock.SecondElapsed>(OnSecondElapsed);
+            Receive<Terminated>(OnTerminated);
         }
 
         void PartiallyAvailable()
         {
             Log.Info("PartiallyAvailable");
+            
+            Receive<BlockClock.NextBlock>(OnNextBlock);
+            Receive<RealTimeClock.SecondElapsed>(OnSecondElapsed);
+            Receive<Terminated>(OnTerminated);
+            Receive<PathfinderProcess.Call>(OnCall);
+            Receive<PathfinderProcess.Return>(OnReturn);
         }
 
         void Available()
         {
             Log.Info("Available");
+            
+            Context.Stop(_catchUpBuffer);
+            _catchUpBuffer = null;
+            
+            Receive<BlockClock.NextBlock>(OnNextBlock);
+            Receive<RealTimeClock.SecondElapsed>(OnSecondElapsed);
+            Receive<Terminated>(OnTerminated);
+            Receive<PathfinderProcess.Call>(OnCall);
+            Receive<PathfinderProcess.Return>(OnReturn);
         }
         
         #endregion
 
-        private void CatchUpQuery<TEventDto>(string name, BlockClock.NextBlock nextBlock)
+        private void OnCall(PathfinderProcess.Call message)
+        {
+            // Find an available pathfinder
+            var availablePathfinder = _pathfinderAvailability
+                .Where(o => o.Value)
+                .Select(o => o.Key)
+                .FirstOrDefault();
+
+            if (availablePathfinder == null)
+            {
+                _nancyAdapterActor.Tell(new PathfinderProcess.Return(message.RpcMessage.Id, "{\"error\":\"temporarily unavailable\"}"));
+            }
+            else
+            {
+                _pathfinderAvailability[availablePathfinder] = false;
+                availablePathfinder.Tell(new PathfinderProcess.Call(message.RpcMessage, Self));
+            }
+        }
+
+        private void OnReturn(PathfinderProcess.Return message)
+        {
+            _pathfinderAvailability[Sender] = true;
+            _nancyAdapterActor.Tell(message);
+        }
+
+        private IActorRef CatchUpQuery<TEventDto>(string name, BlockClock.NextBlock nextBlock)
             where TEventDto : IEventDTO, new()
         {
-            if (_eventBuffer == null || _lastBlockInDb == null)
+            if (_catchUpBuffer == null || _lastBlockInDb == null)
             {
-                throw new Exception($"{nameof(_eventBuffer)} == null || {nameof(_lastBlockInDb)} == null");
+                throw new Exception($"{nameof(_catchUpBuffer)} == null || {nameof(_lastBlockInDb)} == null");
             }
             
             var props = BlockchainEventQuery<TEventDto>.Props(
-                _eventBuffer,
+                _catchUpBuffer,
                 _rpcGateway,
                 _lastBlockInDb.Value.ToHexBigInteger(),
                 nextBlock.BlockNo);
             
             var actor = Context.ActorOf(props, name);
-            Context.Watch(actor);
             _catchUpQueries.Add(actor, name);
             
             Log.Info($"Started '{name}'");
+            return actor;
         }
 
-        void SpawnNextPathfinder()
+        private void OnNextBlock (BlockClock.NextBlock message)
         {
-            // Every pathfinder gets its own event buffer which will
-            // be subscribed to the event stream once the pathfinder has 
-            // caught up.
-            var pathfinder = Context.ActorOf(
-                Pathfinder.Pathfinder.Props(_executable, _dbFile, _rpcGateway), $"Pathfinder_{_missingPathfinders}");
+            // Set the last update block to 'current' if none is currently present
+            _pathfinderAvailability.ForEach(pathfinder =>
+            {
+                if (!_pathfinderLastUpdateAtBlock.ContainsKey(pathfinder.Key))
+                {
+                    _pathfinderLastUpdateAtBlock.Add(pathfinder.Key, message.BlockNo);
+                }
+            });
             
-            _pathfinders.Add(pathfinder, false);
+            // Find the oldest currently available pathfinders and update them
+            var oldestAvailable = _pathfinderAvailability
+                .Where(o => o.Value 
+                            && _pathfinderLastUpdateAtBlock.ContainsKey(o.Key))
+                .Select(o => new
+                {
+                    Key = o.Key,
+                    LastUpdate = _pathfinderLastUpdateAtBlock[o.Key]
+                })
+                .OrderBy(o => o.LastUpdate)
+                .Take(_maxParalellUpdates)
+                .ToArray();
+
+            if (oldestAvailable.Length > 0)
+            {
+                oldestAvailable.ForEach(o =>
+                {
+                    Log.Info($"Updating {o.Key} ..");
+                
+                    // Set unavailable
+                    _pathfinderAvailability[o.Key] = false;
+                
+                    // Created a feeder 
+                    var buffer = _pathfinderProcessAndBuffer[o.Key];
+                    var feeder = Context.ActorOf(Feeder.Props(buffer, o.Key, true));
+                    Context.Watch(feeder);
+                
+                    // Add to the list of updating pathfinders
+                    _updateFeederAndPathfinder.Add(feeder, o.Key);
+                });
+            }
+        }
+
+        private void OnSecondElapsed(RealTimeClock.SecondElapsed _)
+        {
+            if (_catchUpBuffer == null) return; // We already reached "Available"
+            // TODO: Handle the case when single pathfinder instances die..
+            
+            // Spawn new pathfinders as long as some are missing
+            if (_pathfinderAvailability.Count - _targetPathfinders == 0 || _spawningPathfinders > 0)
+            {
+                return;
+            }
+
+            SpawnPathfinder();
+            _spawningPathfinders++;
+        }
+
+        /// <summary>
+        /// Spawns a new pathfinder process and updates it up to
+        /// the currently known block.
+        /// The first initialization will be performed by the <see cref="PathfinderInitializer"/>.
+        /// This step loads the db from a file.
+        /// The next step is to catch up until the current block is reached.
+        /// This is done by feeding the _catchUpBuffer to the new pathfinder (non-consuming).
+        /// When the pathfinder caught up then the next events must be fed
+        /// from its own buffer (_pathfinderProcessAndBuffer - consuming) 
+        /// </summary>
+        private void SpawnPathfinder()
+        {
+            var pathfinderName = $"Pathfinder_{_pathfinderProcessAndBuffer.Count + 1}";
+            Log.Info($"Starting {pathfinderName} ..");
+
+            var pathfinderProcess = Context.ActorOf(
+                PathfinderProcess.Props(_executable),
+                pathfinderName);
+
+            var bufferName = $"{pathfinderName}_Buffer";
+            Log.Info($"Starting {bufferName} ..");
+
+            var buffer = Context.ActorOf(EventBuffer<Tuple<BigInteger, BigInteger>, IEventLog>.Props(
+                    log => Tuple.Create(
+                        BigInteger.Parse(log.Log.BlockNumber.ToString()),
+                        BigInteger.Parse(log.Log.LogIndex.ToString()))),
+                bufferName);
+
+            _pathfinderProcessAndBuffer.Add(pathfinderProcess, buffer);
+
+            var initializerName = $"{pathfinderName}_Initializer";
+            Log.Info($"Starting {initializerName} ..");
+
+            var initializer = Context.ActorOf(
+                PathfinderInitializer.Props(pathfinderProcess, _dbFile),
+                initializerName);
+
+            Context.Watch(initializer);
+            _initializerAndPathfinderProcess.Add(initializer, pathfinderProcess);
+        }
+
+        private void OnTerminated(Terminated message)
+        {
+            if (_initializerAndPathfinderProcess.TryGetValue(message.ActorRef, out var pathfinderProcessRef))
+            {
+                if (_catchUpBuffer == null)
+                {
+                    throw new Exception($"'{nameof(_catchUpBuffer)} == null' in '{nameof(Started)}'");
+                }
+                Log.Info($"{pathfinderProcessRef} completely loaded the database from '{_dbFile}'.");
+                _initializerAndPathfinderProcess.Remove(message.ActorRef);
+
+                var pathfinderBuffer = _pathfinderProcessAndBuffer[pathfinderProcessRef];
+                Log.Info($"Subscribing {pathfinderBuffer} to {nameof(EventLog<SignupEventDTO>)} events ..");
+                Context.System.EventStream.Subscribe<EventLog<SignupEventDTO>>(pathfinderBuffer);
+
+                Log.Info(
+                    $"Subscribing {pathfinderBuffer} to {nameof(EventLog<OrganizationSignupEventDTO>)} events ..");
+                Context.System.EventStream.Subscribe<EventLog<OrganizationSignupEventDTO>>(pathfinderBuffer);
+
+                Log.Info($"Subscribing {pathfinderBuffer} to {nameof(EventLog<TrustEventDTO>)} events ..");
+                Context.System.EventStream.Subscribe<EventLog<TrustEventDTO>>(pathfinderBuffer);
+
+                Log.Info($"Subscribing {pathfinderBuffer} to {nameof(EventLog<TransferEventDTO>)} events ..");
+                Context.System.EventStream.Subscribe<EventLog<TransferEventDTO>>(pathfinderBuffer);
+
+                Log.Info($"Feeding the missing delta between DB and NOW to {pathfinderProcessRef} ..");
+                var feeder = Context.ActorOf(Feeder.Props(
+                    _catchUpBuffer,
+                    pathfinderProcessRef,
+                    false));
+                Context.Watch(feeder);
+
+                _feederAndPathfinderProcess.Add(feeder, pathfinderProcessRef);
+            }
+            else if (_feederAndPathfinderProcess.TryGetValue(message.ActorRef, out pathfinderProcessRef))
+            {
+                Log.Info($"{message.ActorRef} completely fed the feed contents to {pathfinderProcessRef}'.");
+                var buffer = _pathfinderProcessAndBuffer[pathfinderProcessRef];
+                _feederAndPathfinderProcess.Remove(message.ActorRef);
+
+                Log.Info($"{pathfinderProcessRef} caught up. Setting '_pathfinderAvailability' to 'true' and " +
+                         $"using {buffer} for further updates.");
+
+                _pathfinderAvailability.Add(pathfinderProcessRef, true);
+                _spawningPathfinders--;
+
+                if (_pathfinderAvailability.Count == _targetPathfinders)
+                {
+                    Become(Available);
+                }
+                else
+                {
+                    Become(PartiallyAvailable);
+                }
+            }
+            else if (_updateFeederAndPathfinder.TryGetValue(message.ActorRef, out pathfinderProcessRef))
+            {
+                Log.Info($"{pathfinderProcessRef} finished updating.");
+                _updateFeederAndPathfinder.Remove(message.ActorRef);
+                _pathfinderLastUpdateAtBlock.Remove(pathfinderProcessRef);
+                
+                // Set pathfinder to available again
+                _pathfinderAvailability[pathfinderProcessRef] = true;
+            }
         }
         
-        public static Props Props() 
-            => Akka.Actor.Props.Create<Server>();
+        public static Props Props(IActorRef nancyAdapterActor) 
+            => Akka.Actor.Props.Create<Server>(nancyAdapterActor);
     }
 }

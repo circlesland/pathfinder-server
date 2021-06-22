@@ -37,10 +37,12 @@ namespace Pathfinder.Server.Actors.Pathfinder
 
         public sealed class Return
         {
+            public readonly uint Id;
             public readonly string ResultJson;
 
-            public Return(string resultJson)
+            public Return(uint id, string resultJson)
             {
+                Id = id;
                 ResultJson = resultJson;
             }
         }
@@ -112,7 +114,7 @@ namespace Pathfinder.Server.Actors.Pathfinder
                     throw new Exception($"The '{_lastCall.RpcMessage.Cmd}' call failed: {message.ResultJson}");
                 }
 
-                (_lastCall.AnswerTo ?? _lastCallSender).Tell(new Return(message.ResultJson));
+                (_lastCall.AnswerTo ?? _lastCallSender).Tell(new Return(result.id, message.ResultJson));
                 _lastCall = null;
                 Become(Ready);
             });
@@ -187,7 +189,7 @@ namespace Pathfinder.Server.Actors.Pathfinder
                 }
 
                 Log.Info("Calling '{0}': Return: {1}", _lastCall.RpcMessage.Cmd, message.Data);
-                (_lastCall.AnswerTo ?? _lastCallSender).Tell(new Return(message.Data));
+                (_lastCall.AnswerTo ?? _lastCallSender).Tell(new Return((uint)djobject.id, message.Data));
 
                 UnbecomeStacked();
 

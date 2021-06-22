@@ -8,6 +8,12 @@ namespace Pathfinder.Server.Actors.MessageContracts
     {
         public abstract class EmptyBuffer
         {
+            public readonly bool Consume;
+
+            public EmptyBuffer(bool consume)
+            {
+                Consume = consume;
+            }
         }
         
         /// <summary>
@@ -17,7 +23,7 @@ namespace Pathfinder.Server.Actors.MessageContracts
         {
             public readonly IActorRef To;
 
-            public DumpToActor(IActorRef to)
+            public DumpToActor(IActorRef to, bool consume) : base(consume)
             {
                 To = to;
             }
@@ -32,7 +38,7 @@ namespace Pathfinder.Server.Actors.MessageContracts
             public readonly IActorRef To;
             public readonly FeedMode FeedMode;
 
-            public FeedToActor(IActorRef to, FeedMode feedMode)
+            public FeedToActor(IActorRef to, FeedMode feedMode, bool consume) : base(consume)
             {
                 To = to;
                 FeedMode = feedMode;
@@ -44,6 +50,9 @@ namespace Pathfinder.Server.Actors.MessageContracts
         /// </summary>
         public sealed class DumpToStream : EmptyBuffer
         {
+            public DumpToStream(bool consume) : base(consume)
+            {
+            }
         }
     }
 }

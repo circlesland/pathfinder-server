@@ -103,6 +103,16 @@ namespace Pathfinder.Server.Actors
         private readonly GetKey _keyExtractor;
 
         private IActorRef? _feedActor;
+        
+        // Contains the key value up to which point a
+        // currently running feed will return items
+        // from the buffer.
+        // This is used as a boundary to ensure that no new items
+        // with lower keys than the max. key at the time
+        // when the feed started are added.
+        // If items with a lower key that this will be added
+        // the buffer fails,
+        private TKey? _feedingUpTpKey;
 
         public EventBuffer(GetKey keyExtractor)
         {
@@ -116,6 +126,10 @@ namespace Pathfinder.Server.Actors
                 // Check if the message is a collectible event
                 case TValue item:
                     var key = _keyExtractor(item);
+                    if (_feedingUpTpKey != null && key.CompareTo(_feedingUpTpKey) <= 0)
+                    {
+                        throw new Exception($"A new {typeof(TValue).Name} item was added to the {nameof(EventBuffer<TKey,TValue>)} while a feed was active, The added item has a smaller or equal key than the max. feed boundary ({_feedingUpTpKey}).");
+                    }
                     if (_buffer.ContainsKey(key))
                     {
                         Log.Warning(
@@ -145,8 +159,14 @@ namespace Pathfinder.Server.Actors
                     break;
                 case RemoveAndFindNext removeAndFindNext:
                 {
+                    if (_buffer.Count == 0)
+                    {
+                        Sender.Tell(new RemoveAndFindNextResponse(false));
+                        return;
+                    }
+                    
                     var currentKey = removeAndFindNext.CurrentKey == null
-                        ? _buffer.First().Key
+                        ? _buffer.FirstOrDefault().Key
                         : removeAndFindNext.CurrentKey;
 
                     var idx = _buffer.IndexOfKey(currentKey);
@@ -166,8 +186,14 @@ namespace Pathfinder.Server.Actors
                     break;
                 case FindNext findNext:
                 {
+                    if (_buffer.Count == 0)
+                    {
+                        Sender.Tell(new FindNextResponse());
+                        return;
+                    }
+                    
                     var currentKey = findNext.CurrentKey == null
-                        ? _buffer.First().Key
+                        ? _buffer.FirstOrDefault().Key
                         : findNext.CurrentKey;
 
                     var idx = _buffer.IndexOfKey(currentKey);
@@ -208,24 +234,40 @@ namespace Pathfinder.Server.Actors
                     }
 
                     IActorRef self = Self;
-                    TKey? lastKey = default; // TODO: This variable is updated from a different actor.
-                                             // Should be o.k. tough because its local and no one else uses it.
-                                             // When the checks (described below) should be implemented this must change.
                     
+                    // Track which was the last processed key. This is required as argument to "FindNext".
+                    TKey? lastProcessedKey = default; // TODO: This variable is updated from a different actor.
+                    
+                    // Stop at the last key (as of now). This ensures that the caller gets a predictable
+                    // amount of events.
+                    if (_buffer.Values.Count > 0)
+                    {
+                        _feedingUpTpKey = _keyExtractor(_buffer.Values.Last());
+                    }
+
                     _feedActor = Context.ActorOf(Feed<TValue>.Props(
                         finiteFeed.To,
                         async (handshake) =>
                         {
                             // TODO: Don't use Ask. Look for a way to safe some messages..
-                            var item = await self.Ask<RemoveAndFindNextResponse>(new RemoveAndFindNext(lastKey));
+                            var item = finiteFeed.Consume
+                                ? await self.Ask<RemoveAndFindNextResponse>(new RemoveAndFindNext(lastProcessedKey))
+                                : await self.Ask<FindNextResponse>(new FindNext(lastProcessedKey));
+                            
                             if (item.Eof || item.Value == null || item.Key == null)
                             {
                                 // Send EOF
                                 return new FactoryResult();
                             }
 
+                            if (_feedingUpTpKey != null && item.Key.CompareTo(_feedingUpTpKey) > 0)
+                            {
+                                // Send EOF
+                                return new FactoryResult();
+                            }
+
                             // Send item
-                            lastKey = item.Key;
+                            lastProcessedKey = item.Key;
                             return new FactoryResult(item.Value);
                         },
                         FeedMode.Finite,
@@ -249,6 +291,7 @@ namespace Pathfinder.Server.Actors
                     if (_feedActor != null && _feedActor.Equals(terminated.ActorRef))
                     {
                         _feedActor = null;
+                        _feedingUpTpKey = default;
                     }
                     break;
             }

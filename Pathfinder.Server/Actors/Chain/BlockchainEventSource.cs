@@ -10,8 +10,8 @@ using Buffer = Pathfinder.Server.Actors.MessageContracts.Buffer;
 
 namespace Pathfinder.Server.Actors.Chain
 {
-    public class BlockchainEventSource<TEventDTO> : ReceiveActor
-        where TEventDTO : IEventDTO, new()
+    public class BlockchainEventSource<TEventDto> : ReceiveActor
+        where TEventDto : IEventDTO, new()
     {
         private ILoggingAdapter Log { get; } = Context.GetLogger();
         
@@ -92,7 +92,7 @@ namespace Pathfinder.Server.Actors.Chain
                 Log.Debug($"Fetch: From {nextBlock} to {message} ..");
                 
                 var worker = Context.ActorOf(
-                    BlockchainEventQuery<TEventDTO>.Props(_eventBuffer, _rpcGateway, nextBlock.ToHexBigInteger(), message));
+                    BlockchainEventQuery<TEventDto>.Props(_eventBuffer, _rpcGateway, nextBlock.ToHexBigInteger(), message));
                 
                 Context.Watch(worker);
                 _fetchingBlock = message;
@@ -113,7 +113,7 @@ namespace Pathfinder.Server.Actors.Chain
                     Log.Info($"Publish: The query worker received {stats.Items} events in the range from {stats.MinKey} to {stats.MaxKey}. Publishing the events and going back to Wait() ..");
                     _latestBlock = _fetchingBlock;
                     
-                    _eventBuffer.Tell(new Buffer.DumpToStream());
+                    _eventBuffer.Tell(new Buffer.DumpToStream(true));
                 }
                 else
                 {
@@ -126,6 +126,6 @@ namespace Pathfinder.Server.Actors.Chain
         }
         
         public static Props Props(string rpcGateway) 
-            => Akka.Actor.Props.Create<BlockchainEventSource<TEventDTO>>(rpcGateway);
+            => Akka.Actor.Props.Create<BlockchainEventSource<TEventDto>>(rpcGateway);
     }
 }
