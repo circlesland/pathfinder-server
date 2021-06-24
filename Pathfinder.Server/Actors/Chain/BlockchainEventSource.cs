@@ -5,7 +5,6 @@ using Akka.Event;
 using Nethereum.ABI.FunctionEncoding.Attributes;
 using Nethereum.Contracts;
 using Nethereum.Hex.HexTypes;
-using Nethereum.Web3;
 using Buffer = Pathfinder.Server.Actors.MessageContracts.Buffer;
 
 namespace Pathfinder.Server.Actors.Chain
@@ -18,7 +17,6 @@ namespace Pathfinder.Server.Actors.Chain
         protected override void PreStart() => Log.Info($"BlockchainEventSource started.");
         protected override void PostStop() => Log.Info($"BlockchainEventSource stopped.");
 
-        private readonly Web3 _web3;
         private readonly string _rpcGateway;
         
         private HexBigInteger? _latestBlock;
@@ -45,8 +43,7 @@ namespace Pathfinder.Server.Actors.Chain
         public BlockchainEventSource(string rpcGateway)
         {
             _rpcGateway = rpcGateway;
-            _web3 = new Web3(_rpcGateway);
-
+            
             _eventBuffer = Context.ActorOf(EventBuffer<Tuple<BigInteger,BigInteger>, IEventLog>.Props(
                     log => Tuple.Create(
                         BigInteger.Parse(log.Log.BlockNumber.ToString()), 

@@ -91,7 +91,7 @@ namespace Pathfinder.Server.Actors.Pathfinder
                     when (trust.Event.CanSendTo != null && trust.Event.User != null):
                     return new PathfinderProcess.Call(
                         RpcMessage.Trust(trust.Event.CanSendTo, trust.Event.User,
-                            Int32.Parse(trust.Event.Limit.ToString())),
+                            int.Parse(trust.Event.Limit.ToString())),
                         answerTo);
                 case EventLog<TransferEventDTO> transfer:
                     return new PathfinderProcess.Call(

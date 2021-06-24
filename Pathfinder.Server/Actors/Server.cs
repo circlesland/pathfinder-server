@@ -33,8 +33,8 @@ namespace Pathfinder.Server.Actors
         private readonly Dictionary<IActorRef, BigInteger> _pathfinderLastUpdateAtBlock = new();
         private readonly Dictionary<IActorRef, IActorRef> _updateFeederAndPathfinder = new();
 
-        private int _targetPathfinders = 16;
-        private int _maxParalellUpdates = 2;
+        private int _targetPathfinderCount = 8;
+        private int _maxParalellUpdates = 1;
         private int _spawningPathfinders = 0;
         
         private BigInteger? _lastBlockInDb;
@@ -73,6 +73,11 @@ namespace Pathfinder.Server.Actors
         
         public Server(IActorRef nancyAdapterActor)
         {
+            if (_targetPathfinderCount <= _maxParalellUpdates)
+            {
+                throw new Exception($"The target pathfinder count must always be larger than the max. parallel update count.");
+            }
+            
             _nancyAdapterActor = nancyAdapterActor;
             
             Context.ActorOf(RealTimeClock.Props(), "RealTimeClock");
@@ -344,7 +349,7 @@ namespace Pathfinder.Server.Actors
             // TODO: Handle the case when single pathfinder instances die..
             
             // Spawn new pathfinders as long as some are missing
-            if (_pathfinderAvailability.Count - _targetPathfinders == 0 || _spawningPathfinders > 0)
+            if (_pathfinderAvailability.Count - _targetPathfinderCount == 0 || _spawningPathfinders > 0)
             {
                 return;
             }
@@ -440,7 +445,7 @@ namespace Pathfinder.Server.Actors
                 _pathfinderAvailability.Add(pathfinderProcessRef, true);
                 _spawningPathfinders--;
 
-                if (_pathfinderAvailability.Count == _targetPathfinders)
+                if (_pathfinderAvailability.Count == _targetPathfinderCount)
                 {
                     Become(Available);
                 }

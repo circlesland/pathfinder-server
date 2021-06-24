@@ -1,9 +1,11 @@
+using System;
 using System.Collections.Generic;
 using Akka.Actor;
 using Akka.Event;
 using Nethereum.ABI.FunctionEncoding.Attributes;
 using Nethereum.Contracts;
 using Nethereum.Hex.HexTypes;
+using Nethereum.JsonRpc.Client;
 using Nethereum.RPC.Eth.DTOs;
 using Nethereum.Web3;
 
@@ -30,6 +32,7 @@ namespace Pathfinder.Server.Actors.Chain
         {
             _answerTo = answerTo;
             _web3 = new Web3(rpcGateway);
+            ClientBase.ConnectionTimeout = TimeSpan.FromMinutes(2);
             _from = from;
             _to = to;
 
@@ -49,7 +52,7 @@ namespace Pathfinder.Server.Actors.Chain
                     eventDefinition.CreateFilterInput(new BlockParameter(_from), new BlockParameter(_to));
 
                 Become(Publish);
-                
+               
                 eventDefinition.GetAllChanges(eventFilterInput).PipeTo(Self);
             });
         }
