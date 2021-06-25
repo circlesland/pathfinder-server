@@ -33,15 +33,15 @@ namespace Pathfinder.Server.Actors
         private readonly Dictionary<IActorRef, BigInteger> _pathfinderLastUpdateAtBlock = new();
         private readonly Dictionary<IActorRef, IActorRef> _updateFeederAndPathfinder = new();
 
-        private int _targetPathfinderCount = 8;
-        private int _maxParalellUpdates = 1;
+        private readonly int _targetPathfinderCount = Environment.ProcessorCount;
+        private readonly int _maxParallelUpdates = (int)Math.Ceiling(Environment.ProcessorCount / 8f);
         private int _spawningPathfinders = 0;
         
         private BigInteger? _lastBlockInDb;
         
-        string _executable = "/home/daniel/src/pathfinder/build/pathfinder";
+        string _executable = "./pathfinder";
+        string _dbFile = "./db.dat";
         string _rpcGateway = "https://rpc.circles.land";
-        string _dbFile = "/home/daniel/src/circles-world/PathfinderServer/Pathfinder.Server/db.dat";
         
         protected override SupervisorStrategy SupervisorStrategy()
         {
@@ -73,7 +73,7 @@ namespace Pathfinder.Server.Actors
         
         public Server(IActorRef nancyAdapterActor)
         {
-            if (_targetPathfinderCount <= _maxParalellUpdates)
+            if (_targetPathfinderCount <= _maxParallelUpdates)
             {
                 throw new Exception($"The target pathfinder count must always be larger than the max. parallel update count.");
             }
@@ -320,7 +320,7 @@ namespace Pathfinder.Server.Actors
                     LastUpdate = _pathfinderLastUpdateAtBlock[o.Key]
                 })
                 .OrderBy(o => o.LastUpdate)
-                .Take(_maxParalellUpdates)
+                .Take(_maxParallelUpdates)
                 .ToArray();
 
             if (oldestAvailable.Length > 0)

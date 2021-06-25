@@ -110,9 +110,9 @@ namespace Pathfinder.Server.Actors
         // This is used as a boundary to ensure that no new items
         // with lower keys than the max. key at the time
         // when the feed started are added.
-        // If items with a lower key that this will be added
+        // If items with a lower key than this will be added
         // the buffer fails,
-        private TKey? _feedingUpTpKey;
+        private TKey? _feedingUpToKey;
 
         public EventBuffer(GetKey keyExtractor)
         {
@@ -126,9 +126,9 @@ namespace Pathfinder.Server.Actors
                 // Check if the message is a collectible event
                 case TValue item:
                     var key = _keyExtractor(item);
-                    if (_feedingUpTpKey != null && key.CompareTo(_feedingUpTpKey) <= 0)
+                    if (_feedingUpToKey != null && key.CompareTo(_feedingUpToKey) <= 0)
                     {
-                        throw new Exception($"A new {typeof(TValue).Name} item was added to the {nameof(EventBuffer<TKey,TValue>)} while a feed was active, The added item has a smaller or equal key than the max. feed boundary ({_feedingUpTpKey}).");
+                        throw new Exception($"A new {typeof(TValue).Name} item was added to the {nameof(EventBuffer<TKey,TValue>)} while a feed was active, The added item has a smaller or equal key than the max. feed boundary ({_feedingUpToKey}).");
                     }
                     if (_buffer.ContainsKey(key))
                     {
@@ -242,7 +242,7 @@ namespace Pathfinder.Server.Actors
                     // amount of events.
                     if (_buffer.Values.Count > 0)
                     {
-                        _feedingUpTpKey = _keyExtractor(_buffer.Values.Last());
+                        _feedingUpToKey = _keyExtractor(_buffer.Values.Last());
                     }
 
                     _feedActor = Context.ActorOf(Feed<TValue>.Props(
@@ -260,7 +260,7 @@ namespace Pathfinder.Server.Actors
                                 return new FactoryResult();
                             }
 
-                            if (_feedingUpTpKey != null && item.Key.CompareTo(_feedingUpTpKey) > 0)
+                            if (_feedingUpToKey != null && item.Key.CompareTo(_feedingUpToKey) > 0)
                             {
                                 // Send EOF
                                 return new FactoryResult();
@@ -291,7 +291,7 @@ namespace Pathfinder.Server.Actors
                     if (_feedActor != null && _feedActor.Equals(terminated.ActorRef))
                     {
                         _feedActor = null;
-                        _feedingUpTpKey = default;
+                        _feedingUpToKey = default;
                     }
                     break;
             }

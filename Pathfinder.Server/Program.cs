@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Akka.Actor;
 using Nancy.Hosting.Self;
@@ -13,6 +14,14 @@ namespace Pathfinder.Server
         
         static async Task Main()
         {
+            var httpEndpoint = "http://localhost:7891";
+            var listenerUri = new Uri(httpEndpoint);
+
+            Console.WriteLine($"Starting http-server at {listenerUri} ..");
+            _host = new NancyHost(listenerUri);
+            _host.Start();
+            Console.WriteLine($"Http-server running at: {listenerUri}");
+            
             var config = @"akka {  
                             stdout-loglevel = DEBUG
                             loglevel = DEBUG
@@ -32,11 +41,14 @@ namespace Pathfinder.Server
                 Props.Create<NancyAdapterActor>(ApiNancyModule._resetEvents, ApiNancyModule._responses));
             
             ServerActor = system.ActorOf(Actors.Server.Props(ApiNancyModule.NancyAdapterActor), "main");
-                
-            _host = new NancyHost(new Uri($"http://127.0.0.1:9999"));
-            _host.Start();
-                
-            Console.ReadLine();
+            
+            var exitTrigger = new CancellationTokenSource();
+            AppDomain.CurrentDomain.ProcessExit += (s, e) => 
+            {
+                exitTrigger.Cancel();
+            };
+
+            await Task.Delay(-1, exitTrigger.Token);
         }
     }
 }
