@@ -12,8 +12,10 @@ namespace Pathfinder.Server
 {
     class Program
     {
+        private static Timer t;
         private static NancyHost? _host;
         public static IActorRef? ServerActor;
+        static int i = 0;
 
         static async Task Main()
         {
@@ -45,8 +47,7 @@ namespace Pathfinder.Server
             
             // ServerActor = system.ActorOf(Actors.Server.Props(ApiNancyModule.NancyAdapterActor), "main");
 
-            int i = 0;
-            Timer t = new Timer(async (_) =>
+            t = new Timer(async (_) =>
             {
                 try
                 {
@@ -72,7 +73,7 @@ namespace Pathfinder.Server
                 {
                     system.Log.Error("Abfuck:", e);
                 }
-            }, null, TimeSpan.FromMinutes(0), TimeSpan.FromMinutes(10));
+            }, null, TimeSpan.FromMinutes(0), TimeSpan.FromMinutes(5));
 
             var exitTrigger = new CancellationTokenSource();
             AppDomain.CurrentDomain.ProcessExit += (s, e) => { exitTrigger.Cancel(); };
