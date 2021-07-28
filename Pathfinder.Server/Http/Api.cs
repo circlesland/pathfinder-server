@@ -23,6 +23,14 @@ namespace Pathfinder.Server.Http
             // 127.0.0.1:9999/flow/0xDE374ece6fA50e781E81Aac78e811b33D16912c7/0x50958e084D5E9E890ECc0A98e4d5EA50962681F0/100
             Get("/flow/{from}/{to}/{value}", async args =>
             {
+                if (Program.ServerActor == null)
+                {
+                    return Response.AsJson(new
+                    {
+                        error = "temporarily unavailable"
+                    }, HttpStatusCode.ServiceUnavailable);
+                }
+                
                 if (NancyAdapterActor == null)
                 {
                     throw new Exception("NancyAdapterActor == null");
@@ -41,6 +49,14 @@ namespace Pathfinder.Server.Http
                     
                 if (_responses.TryRemove(query.RpcMessage.Id, out var returnValue))
                 {
+                    if (returnValue.ResultJson == String.Empty)
+                    {
+                        return Response.AsJson(new
+                        {
+                            error = "temporarily unavailable"
+                        }, HttpStatusCode.ServiceUnavailable);
+                    }
+                    
                     var re = new TextResponse(HttpStatusCode.OK, returnValue.ResultJson, Encoding.UTF8);
                     re.ContentType = "application/json";
                     return re;
@@ -54,6 +70,14 @@ namespace Pathfinder.Server.Http
             
             Get("/adjacencies/{of}", async args =>
             {
+                if (Program.ServerActor == null)
+                {
+                    return Response.AsJson(new
+                    {
+                        error = "temporarily unavailable"
+                    }, HttpStatusCode.ServiceUnavailable);
+                }
+                
                 if (NancyAdapterActor == null)
                 {
                     throw new Exception("NancyAdapterActor == null");
@@ -70,6 +94,14 @@ namespace Pathfinder.Server.Http
                     
                 if (_responses.TryRemove(query.RpcMessage.Id, out var returnValue))
                 {
+                    if (returnValue.ResultJson == String.Empty)
+                    {
+                        return Response.AsJson(new
+                        {
+                            error = "temporarily unavailable"
+                        }, HttpStatusCode.ServiceUnavailable);
+                    }
+                    
                     var re = new TextResponse(HttpStatusCode.OK, returnValue.ResultJson, Encoding.UTF8);
                     re.ContentType = "application/json";
                     return re;
