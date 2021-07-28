@@ -89,6 +89,9 @@ namespace Pathfinder.Server
             if (File.Exists("db.dat") && File.Exists(fileName))
             {
                 File.Delete("db.dat");
+            }
+
+            if (File.Exists(fileName)) {
                 File.Move(fileName, "db.dat");
             }
         }
