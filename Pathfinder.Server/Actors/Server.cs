@@ -88,6 +88,11 @@ namespace Pathfinder.Server.Actors
             Context.ActorOf(BlockchainEventSource<TrustEventDTO>.Props(_rpcGateway), "TrustEventSource");
             Context.ActorOf(BlockchainEventSource<TransferEventDTO>.Props(_rpcGateway), "TransferEventSource");
             
+            Receive<PathfinderProcess.Call>(msg =>
+            {
+                _nancyAdapterActor.Tell(new PathfinderProcess.Return(msg.RpcMessage.Id, ""));
+            });
+            
             Become(Starting);
         }
 
@@ -154,6 +159,10 @@ namespace Pathfinder.Server.Actors
                 // Start to fill the buffer
                 Become(CatchingUp);
             });
+            Receive<PathfinderProcess.Call>(msg =>
+            {
+                _nancyAdapterActor.Tell(new PathfinderProcess.Return(msg.RpcMessage.Id, ""));
+            });
         }
 
         void CatchingUp()
@@ -215,6 +224,10 @@ namespace Pathfinder.Server.Actors
                     Become(Started);
                 }
             });
+            Receive<PathfinderProcess.Call>(msg =>
+            {
+                _nancyAdapterActor.Tell(new PathfinderProcess.Return(msg.RpcMessage.Id, ""));
+            });
         }
         
         void Started()
@@ -224,6 +237,10 @@ namespace Pathfinder.Server.Actors
             
             Receive<RealTimeClock.SecondElapsed>(OnSecondElapsed);
             Receive<Terminated>(OnTerminated);
+            Receive<PathfinderProcess.Call>(msg =>
+            {
+                _nancyAdapterActor.Tell(new PathfinderProcess.Return(msg.RpcMessage.Id, ""));
+            });
         }
 
         void PartiallyAvailable()

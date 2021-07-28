@@ -22,9 +22,6 @@
       <None Update="pathfinder">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
-      <None Update="db.dat">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
     </ItemGroup>
 
 </Project>
