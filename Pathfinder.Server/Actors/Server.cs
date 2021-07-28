@@ -280,7 +280,7 @@ namespace Pathfinder.Server.Actors
 
             if (availablePathfinder == null)
             {
-                _nancyAdapterActor.Tell(new PathfinderProcess.Return(message.RpcMessage.Id, "{\"error\":\"temporarily unavailable\"}"));
+                _nancyAdapterActor.Tell(new PathfinderProcess.Return(message.RpcMessage.Id, ""));
             }
             else
             {

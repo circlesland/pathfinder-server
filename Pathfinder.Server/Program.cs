@@ -72,7 +72,7 @@ namespace Pathfinder.Server
                 {
                     system.Log.Error("Abfuck:", e);
                 }
-            }, null, TimeSpan.FromMinutes(0), TimeSpan.FromSeconds(30));
+            }, null, TimeSpan.FromMinutes(0), TimeSpan.FromMinutes(10));
 
             var exitTrigger = new CancellationTokenSource();
             AppDomain.CurrentDomain.ProcessExit += (s, e) => { exitTrigger.Cancel(); };
