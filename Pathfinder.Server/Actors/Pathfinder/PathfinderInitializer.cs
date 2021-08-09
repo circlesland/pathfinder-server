@@ -6,7 +6,7 @@ using Newtonsoft.Json.Linq;
 
 namespace Pathfinder.Server.Actors.Pathfinder
 {
-    public class PathfinderInitializer : ReceiveActor
+    public class PathfinderInitializer : LoggingReceiveActor
     {
         #region Messages
 
@@ -21,11 +21,6 @@ namespace Pathfinder.Server.Actors.Pathfinder
         }
 
         #endregion
-        
-        private ILoggingAdapter Log { get; } = Context.GetLogger();
-        
-        protected override void PreStart() => Log.Info("PathfinderInitializer started.");
-        protected override void PostStop() => Log.Info("PathfinderInitializer stopped");
         
         private readonly IActorRef _answerTo;
         private readonly IActorRef _pathfinder;

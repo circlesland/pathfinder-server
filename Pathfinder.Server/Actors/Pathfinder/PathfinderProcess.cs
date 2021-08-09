@@ -3,13 +3,12 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using Akka.Actor;
-using Akka.Event;
 using Newtonsoft.Json.Linq;
 using Pathfinder.Server.Actors.System;
 
 namespace Pathfinder.Server.Actors.Pathfinder
 {
-    public class PathfinderProcess : ReceiveActor
+    public class PathfinderProcess : LoggingReceiveActor
     {
         #region Messages
 
@@ -48,11 +47,6 @@ namespace Pathfinder.Server.Actors.Pathfinder
         }
 
         #endregion
-
-        private ILoggingAdapter Log { get; } = Context.GetLogger();
-
-        protected override void PostStop() => Log.Info("PathfinderProcess stopped");
-        protected override void PreStart() => Log.Info("PathfinderProcess started.");
 
         private readonly IActorRef _processWrapper;
         

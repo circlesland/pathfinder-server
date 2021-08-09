@@ -11,13 +11,8 @@ namespace Pathfinder.Server.Actors.Pathfinder
     /// <summary>
     /// Feeds an <see cref="EventBuffer{TKey,TValue}"/> to a <see cref="PathfinderProcess"/>.
     /// </summary>
-    public class Feeder : ReceiveActor
+    public class Feeder : LoggingReceiveActor
     {
-        private ILoggingAdapter Log { get; } = Context.GetLogger();
-
-        protected override void PreStart() => Log.Info("PathfinderFeeder started.");
-        protected override void PostStop() => Log.Info("PathfinderFeeder stopped");
-
         private readonly IActorRef _feedEventBuffer;
         private readonly IActorRef _toPathfinderProcess;
         private readonly bool _consumeFeed;

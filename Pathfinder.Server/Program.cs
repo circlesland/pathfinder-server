@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Data;
 using System.IO;
 using System.Net;
 using System.Threading;
@@ -12,7 +11,6 @@ namespace Pathfinder.Server
 {
     class Program
     {
-        private static Timer t;
         private static NancyHost? _host;
         public static IActorRef? ServerActor;
         static int i = 0;
@@ -47,21 +45,34 @@ namespace Pathfinder.Server
             
             // ServerActor = system.ActorOf(Actors.Server.Props(ApiNancyModule.NancyAdapterActor), "main");
 
-            t = new Timer(async (_) =>
+            const double restartIntervalInSeconds = 7.5 * 60;
+            var stopping = false;
+
+            await using var t = new Timer(async (_) =>
             {
+                if (stopping)
+                {
+                    return;
+                }
+                
                 try
                 {
                     var serverActor = ServerActor;
-                    ServerActor = null;
                     
                     system.Log.Warning("Restarting... Downloading snapshot..");
                     await DownloadSnapshot();
                     system.Log.Warning("Restarting... Downloaded snapshot.");
 
+                    ServerActor = null;
+                    
                     if (serverActor != null)
                     {
                         system.Log.Warning("Restarting... Stopping ServerActor ..");
-                        await serverActor.GracefulStop(TimeSpan.FromMinutes(1));
+                        
+                        stopping = true;
+                        await serverActor.GracefulStop(TimeSpan.FromSeconds(restartIntervalInSeconds / 2));
+                        stopping = false;
+                        
                         system.Log.Warning("Restarting... Stopped ServerActor.");
                     }
 
@@ -73,15 +84,15 @@ namespace Pathfinder.Server
                 {
                     system.Log.Error("Abfuck:", e);
                 }
-            }, null, TimeSpan.FromMinutes(0), TimeSpan.FromMinutes(5));
+            }, null, TimeSpan.FromMinutes(0), TimeSpan.FromSeconds(restartIntervalInSeconds));
 
             var exitTrigger = new CancellationTokenSource();
             AppDomain.CurrentDomain.ProcessExit += (s, e) => { exitTrigger.Cancel(); };
 
             await Task.Delay(-1, exitTrigger.Token);
         }
-        
-        public static async Task DownloadSnapshot()
+
+        private static async Task DownloadSnapshot()
         {
             string fileName = Guid.NewGuid().ToString("N");
             WebClient webClient = new ();

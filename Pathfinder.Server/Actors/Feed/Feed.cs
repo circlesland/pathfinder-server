@@ -2,14 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Akka.Actor;
-using Akka.Event;
 
 namespace Pathfinder.Server.Actors.Feed
 {
-    public class Feed<TPayload> : ReceiveActor
+    public class Feed<TPayload> : LoggingReceiveActor
     {
-        private ILoggingAdapter Log { get; } = Context.GetLogger();
-
         protected override void PreStart() => Log.Info($"Feed<{typeof(TPayload).Name}> started.");
         protected override void PostStop() => Log.Info($"Feed<{typeof(TPayload).Name}> stopped.");
 

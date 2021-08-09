@@ -7,7 +7,7 @@ using Akka.Event;
 
 namespace Pathfinder.Server.Actors.System
 {
-    public class ProcessWrapper : ReceiveActor
+    public class ProcessWrapper : LoggingReceiveActor
     {
         #region Messages
         
@@ -84,8 +84,6 @@ namespace Pathfinder.Server.Actors.System
         
         #endregion
 
-        private ILoggingAdapter Log { get; } = Context.GetLogger();
-        
         protected override void PreStart() => Log.Info($"ProcessWrapper started. Running '{_executable}' with args '{string.Join(" ", _arguments)}'");
         protected override void PostStop()
         {

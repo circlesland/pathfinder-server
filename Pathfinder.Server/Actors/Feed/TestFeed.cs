@@ -2,17 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Akka.Actor;
-using Akka.Event;
 
 namespace Pathfinder.Server.Actors.Feed
 {
-    public class TestFeed : ReceiveActor
+    public class TestFeed : LoggingReceiveActor
     {
-        private ILoggingAdapter Log { get; } = Context.GetLogger();
-
-        protected override void PreStart() => Log.Info($"TestFeedHost started.");
-        protected override void PostStop() => Log.Info($"TestFeedHost stopped.");
-
         private IActorRef _feed;
 
         public TestFeed(IActorRef consumer)

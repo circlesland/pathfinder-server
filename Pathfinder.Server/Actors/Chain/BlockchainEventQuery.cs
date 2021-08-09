@@ -11,17 +11,12 @@ using Nethereum.Web3;
 
 namespace Pathfinder.Server.Actors.Chain
 {
-    public class BlockchainEventQuery<TEventDTO> : ReceiveActor
+    public class BlockchainEventQuery<TEventDTO> : LoggingReceiveActor
         where TEventDTO : IEventDTO, new()
     {
         public sealed class Empty
         {
         }
-        
-        private ILoggingAdapter Log { get; } = Context.GetLogger();
-
-        protected override void PreStart() => Log.Debug($"BlockchainEventQuery started.");
-        protected override void PostStop() => Log.Debug($"BlockchainEventQuery stopped.");
 
         private readonly Web3 _web3;
         private readonly HexBigInteger _from;

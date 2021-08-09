@@ -1,5 +1,4 @@
 using Akka.Actor;
-using Akka.Event;
 using Nethereum.Hex.HexTypes;
 using Nethereum.Web3;
 using Pathfinder.Server.Actors.MessageContracts;
@@ -7,7 +6,7 @@ using Pathfinder.Server.Actors.System;
 
 namespace Pathfinder.Server.Actors.Chain
 {
-    public class BlockClock : UntypedActor
+    public class BlockClock : LoggingReceiveActor
     {
         #region Messages
 
@@ -23,11 +22,6 @@ namespace Pathfinder.Server.Actors.Chain
 
         #endregion
 
-        private ILoggingAdapter Log { get; } = Context.GetLogger();
-
-        protected override void PreStart() => Log.Info($"BlockClock started.");
-        protected override void PostStop() => Log.Info($"BlockClock stopped.");
-
         private readonly string _rpcGateway;
         private HexBigInteger? _lastBlock;
 
@@ -35,28 +29,24 @@ namespace Pathfinder.Server.Actors.Chain
         {
             _rpcGateway = rpcGateway;
             Context.System.EventStream.Subscribe(Self, typeof(RealTimeClock.SecondElapsed));
-        }
 
-        protected override void OnReceive(object message)
-        {
-            switch (message)
+            Receive<RealTimeClock.SecondElapsed>(_ =>
             {
-                case RealTimeClock.SecondElapsed:
-                    new Web3(_rpcGateway).Eth.Blocks.GetBlockNumber.SendRequestAsync().PipeTo(Self);
-                    break;
-                case HexBigInteger currentBlock:
-                    if (_lastBlock != currentBlock)
-                    {
-                        Log.Info($"New block: {currentBlock}");
-                        Context.System.EventStream.Publish(new NextBlock(currentBlock));
-                    }
+                new Web3(_rpcGateway).Eth.Blocks.GetBlockNumber.SendRequestAsync().PipeTo(Self);
+            });
+            
+            Receive<HexBigInteger>(currentBlock =>
+            {
+                if (_lastBlock != currentBlock)
+                {
+                    Log.Info($"New block: {currentBlock}");
+                    Context.System.EventStream.Publish(new NextBlock(currentBlock));
+                }
 
-                    _lastBlock = currentBlock;
-                    break;
-                case Status.Failure failure:
-                    Log.Error(failure.Cause, "Couldn't get the current block.");
-                    break;
-            }
+                _lastBlock = currentBlock;
+            });
+
+            Receive<Status.Failure>(failure => Log.Error(failure.Cause, "Couldn't get the current block."));
         }
 
         public static Props Props(string rpcGateway)

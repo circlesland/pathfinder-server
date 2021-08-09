@@ -1,10 +1,9 @@
 using System;
 using Akka.Actor;
-using Akka.Event;
 
 namespace Pathfinder.Server.Actors.System
 {
-    public class RealTimeClock : UntypedActor
+    public class RealTimeClock : LoggingReceiveActor
     {
         #region Messages
 
@@ -50,24 +49,16 @@ namespace Pathfinder.Server.Actors.System
 
         #endregion
 
-        private ILoggingAdapter Log { get; } = Context.GetLogger();
-
-        protected override void PreStart() => Log.Info($"RealTimeClock started.");
-        protected override void PostStop() => Log.Info($"RealTimeClock stopped.");
+        private int _lastSecond = -1;
+        private int _lastMinute = -1;
+        private int _lastHour = -1;
 
         public RealTimeClock()
         {
             Context.System.Scheduler.ScheduleTellRepeatedly(
                 TimeSpan.Zero, TimeSpan.FromSeconds(1), Self, Tick.Instance, Self);
-        }
 
-        private int _lastSecond = -1;
-        private int _lastMinute = -1;
-        private int _lastHour = -1;
-
-        protected override void OnReceive(object message)
-        {
-            if (message is Tick)
+            Receive<Tick>(message =>
             {
                 var now = DateTime.Now;
 
@@ -92,7 +83,7 @@ namespace Pathfinder.Server.Actors.System
                 _lastSecond = now.Second;
                 _lastMinute = now.Minute;
                 _lastHour = now.Hour;
-            }
+            });
         }
 
         public static Props Props()

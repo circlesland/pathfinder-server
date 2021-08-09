@@ -1,13 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Threading.Tasks;
 using Akka.Actor;
-using Akka.Event;
 
 namespace Pathfinder.Server.Actors.Feed
 {
-    public class Consumer<TPayload> : ReceiveActor
+    public class Consumer<TPayload> : LoggingReceiveActor
     {
         #region Messages
 
@@ -30,8 +28,6 @@ namespace Pathfinder.Server.Actors.Feed
         }
 
         #endregion
-        
-        private ILoggingAdapter Log { get; } = Context.GetLogger();
         
         protected override void PreStart() => Log.Info($"Consumer<{typeof(TPayload).Name}> started.");
         protected override void PostStop() => Log.Info($"Consumer<{typeof(TPayload).Name}> stopped.");

@@ -9,14 +9,9 @@ using Buffer = Pathfinder.Server.Actors.MessageContracts.Buffer;
 
 namespace Pathfinder.Server.Actors.Chain
 {
-    public class BlockchainEventSource<TEventDto> : ReceiveActor
+    public class BlockchainEventSource<TEventDto> : LoggingReceiveActor
         where TEventDto : IEventDTO, new()
     {
-        private ILoggingAdapter Log { get; } = Context.GetLogger();
-        
-        protected override void PreStart() => Log.Info($"BlockchainEventSource started.");
-        protected override void PostStop() => Log.Info($"BlockchainEventSource stopped.");
-
         private readonly string _rpcGateway;
         
         private HexBigInteger? _latestBlock;
