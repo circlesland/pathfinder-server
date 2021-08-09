@@ -16,13 +16,8 @@ using Pathfinder.Server.contracts;
 
 namespace Pathfinder.Server.Actors
 {
-    public class Server : ReceiveActor
-    {       
-        private ILoggingAdapter Log { get; } = Context.GetLogger();
-        
-        protected override void PreStart() => Log.Info($"Main started.");
-        protected override void PostStop() => Log.Info($"Main stopped.");
-
+    public class Server : LoggingReceiveActor
+    {
         private IActorRef? _catchUpBuffer;
         
         private readonly Dictionary<IActorRef, string> _catchUpQueries = new ();
@@ -182,6 +177,11 @@ namespace Pathfinder.Server.Actors
             
             Receive<BlockClock.NextBlock>(message =>
             {
+                if (waitForQueries)
+                {
+                    return;
+                }
+                
                 Log.Info($"Catching up until block {message.BlockNo} (while collecting new events in the background) ..");
                 Context.System.EventStream.Unsubscribe(Self, typeof(BlockClock.NextBlock));
 
@@ -224,6 +224,7 @@ namespace Pathfinder.Server.Actors
                     Become(Started);
                 }
             });
+            
             Receive<PathfinderProcess.Call>(msg =>
             {
                 _nancyAdapterActor.Tell(new PathfinderProcess.Return(msg.RpcMessage.Id, ""));
