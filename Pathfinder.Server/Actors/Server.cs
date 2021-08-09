@@ -96,6 +96,9 @@ namespace Pathfinder.Server.Actors
         void Starting()
         {
             Log.Info("Starting");
+
+            // TODO: Hack to tell the nancy api if the server actor is available or not
+            Program.ServerActor = Self;
             
             // Start the first pathfinder process and initialize it with the database file.
             // Then find the last block in the database file and throw away the pathfinder instance.

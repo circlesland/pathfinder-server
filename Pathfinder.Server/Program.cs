@@ -12,7 +12,7 @@ namespace Pathfinder.Server
     class Program
     {
         private static NancyHost? _host;
-        public static IActorRef? ServerActor;
+        public static volatile IActorRef? ServerActor;
         static int i = 0;
 
         static async Task Main()
@@ -63,6 +63,7 @@ namespace Pathfinder.Server
                     await DownloadSnapshot();
                     system.Log.Warning("Restarting... Downloaded snapshot.");
 
+                    // TODO: Hack to tell the nancy api if the server actor is available or not
                     ServerActor = null;
                     
                     if (serverActor != null)
@@ -77,7 +78,7 @@ namespace Pathfinder.Server
                     }
 
                     system.Log.Warning("Restarting... Starting ServerActor...");
-                    ServerActor = system.ActorOf(Actors.Server.Props(ApiNancyModule.NancyAdapterActor), "main" + (i++));
+                    system.ActorOf(Actors.Server.Props(ApiNancyModule.NancyAdapterActor), "main" + (i++));
                     system.Log.Warning("Restarting... Started ServerActor.");
                 }
                 catch (Exception e)
