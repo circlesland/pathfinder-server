@@ -15,7 +15,7 @@ namespace Pathfinder.Server
         public static volatile IActorRef? ServerActor;
         static int i = 0;
 
-        static async Task Main()
+        static async Task Main(string[] args)
         {
             var httpEndpoint = "http://localhost:7891";
             var listenerUri = new Uri(httpEndpoint);
@@ -45,7 +45,17 @@ namespace Pathfinder.Server
             
             // ServerActor = system.ActorOf(Actors.Server.Props(ApiNancyModule.NancyAdapterActor), "main");
 
-            const double restartIntervalInSeconds = 7.5 * 60;
+            var restartIntervalInSeconds = 30 * 60;
+            if (args.Length > 0)
+            {
+                if (!int.TryParse(args[0].Trim(), out var restartIntervalFromCmd))
+                {
+                    throw new Exception("Couldn't parse the restart interval in seconds from the command line. " +
+                                        $"Expected 'int' got: {args[0]}");
+                }
+
+                restartIntervalInSeconds = restartIntervalFromCmd;
+            }
             var stopping = false;
 
             await using var t = new Timer(async (_) =>
